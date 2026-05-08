@@ -1,0 +1,42 @@
+name: build-images
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - images/hermes-agent/**
+      - images/claude-code/**
+      - .github/workflows/build-images.yml
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: hermes-agent
+            dockerfile: images/hermes-agent/Dockerfile
+            context: images/hermes-agent
+          - name: claude-code
+            dockerfile: images/claude-code/Dockerfile
+            context: images/claude-code
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: false
+          tags: privatecloud/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,109 @@
+# =============================================================================
+# 公司级 Provider 配置模板
+# 定义公司提供的所有 LLM Provider，容器启动时自动读取
+#
+# 管理员只需:
+#   1. 在此文件中配置 provider 信息
+#   2. 在 .env 中填入对应的 API Key
+#   容器启动时自动完成 config.yaml + .env 注入
+#
+# 用户可以:
+#   - 直接使用公司配置（默认）
+#   - 通过 hermes model 自主切换到个人 provider
+#   - 通过 hermes config set model.providers.xxx.api_key 设置个人 key
+# =============================================================================
+
+# ── 默认使用的 Provider ──
+# 优先级: 如果 .env 中有多个 key，按此顺序选择第一个可用的
+default_provider_priority:
+  - deepseek
+  - minimax
+  - dashscope
+  - anthropic
+  - openrouter
+  - custom
+
+# ── Provider 定义 ──
+providers:
+
+  # ── DeepSeek ──
+  deepseek:
+    display_name: "DeepSeek"
+    # model 格式: provider/model-name
+    # Hermes 支持 deepseek 前缀自动路由
+    model: "deepseek/deepseek-chat"
+    # API Key 环境变量名（在 .env 中设置）
+    api_key_env: "DEEPSEEK_API_KEY"
+    # Hermes 内置支持 DeepSeek，无需 base_url
+    # 如果需要自定义 endpoint，取消下面注释:
+    # base_url: "https://api.deepseek.com/v1"
+    context_length: 65536
+
+  # ── DeepSeek Reasoner（推理模型）──
+  deepseek-reasoner:
+    display_name: "DeepSeek Reasoner"
+    model: "deepseek/deepseek-reasoner"
+    api_key_env: "DEEPSEEK_API_KEY"
+    context_length: 65536
+
+  # ── MiniMax ──
+  minimax:
+    display_name: "MiniMax"
+    model: "minimax/MiniMax-Text-01"
+    api_key_env: "MINIMAX_API_KEY"
+    # MiniMax 需要自定义 base_url
+    base_url: "https://api.minimax.chat/v1"
+    context_length: 1000000
+
+  # ── 阿里百炼 (DashScope / Qwen) ──
+  dashscope:
+    display_name: "阿里百炼 Qwen"
+    model: "dashscope/qwen-max"
+    api_key_env: "DASHSCOPE_API_KEY"
+    # DashScope OpenAI 兼容接口
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    context_length: 131072
+
+  # ── Anthropic (Claude) ──
+  anthropic:
+    display_name: "Anthropic Claude"
+    model: "anthropic/claude-sonnet-4-6"
+    api_key_env: "ANTHROPIC_API_KEY"
+    context_length: 200000
+
+  # ── OpenRouter（多模型路由）──
+  openrouter:
+    display_name: "OpenRouter"
+    model: "openrouter/anthropic/claude-sonnet-4"
+    api_key_env: "OPENROUTER_API_KEY"
+    context_length: 200000
+
+  # ── 自定义 Provider（示例）──
+  # 取消注释并填写实际值即可使用
+  custom:
+    display_name: "公司自建模型"
+    model: "openai/company-model"
+    api_key_env: "CUSTOM_API_KEY"
+    base_url: "https://llm.company.com/v1"
+    context_length: 32768
+
+  # ── 更多 provider 按需添加 ──
+  # glm:
+  #   display_name: "智谱 GLM"
+  #   model: "glm/glm-4-plus"
+  #   api_key_env: "GLM_API_KEY"
+  #   base_url: "https://open.bigmodel.cn/api/paas/v4"
+  #   context_length: 128000
+  #
+  # kimi:
+  #   display_name: "Kimi / Moonshot"
+  #   model: "kimi/moonshot-v1-128k"
+  #   api_key_env: "KIMI_API_KEY"
+  #   base_url: "https://api.moonshot.cn/v1"
+  #   context_length: 128000
+  #
+  # xiaomi:
+  #   display_name: "小米 MiMo"
+  #   model: "xiaomi/mimo-v2.5-pro"
+  #   api_key_env: "XIAOMI_API_KEY"
+  #   context_length: 131072

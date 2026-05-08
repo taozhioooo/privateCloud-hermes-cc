@@ -1,0 +1,22 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Runtime data
+*.log
+*.pid
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
