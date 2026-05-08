@@ -1,4 +1,4 @@
-name: build-images
+name: build-and-push-images
 
 on:
   push:
@@ -19,9 +19,11 @@ jobs:
           - name: hermes-agent
             dockerfile: images/hermes-agent/Dockerfile
             context: images/hermes-agent
+            image: gmsoft_hub/hermes-agent
           - name: claude-code
             dockerfile: images/claude-code/Dockerfile
             context: images/claude-code
+            image: gmsoft_hub/claude-code
 
     steps:
       - name: Checkout
@@ -30,13 +32,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image
+      - name: Log in to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.ACR_REGISTRY }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
+
+      - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          push: false
-          load: false
-          tags: privatecloud/${{ matrix.name }}:${{ github.sha }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
