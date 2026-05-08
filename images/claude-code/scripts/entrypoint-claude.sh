@@ -23,6 +23,11 @@ HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "SERVER_IP")
 # ══════════════════════════════════════════════════════════════════
 
 echo "claude:${CLAUDE_SSH_PASS}" | sudo chpasswd
+mkdir -p "${CLAUDE_HOME}/.ssh"
+touch "${CLAUDE_HOME}/.ssh/authorized_keys"
+chown -R claude:claude "${CLAUDE_HOME}/.ssh"
+chmod 700 "${CLAUDE_HOME}/.ssh"
+chmod 600 "${CLAUDE_HOME}/.ssh/authorized_keys"
 
 # 导入用户公钥
 if [ -n "$SSH_PUBLIC_KEY" ]; then

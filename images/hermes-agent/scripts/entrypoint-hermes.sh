@@ -71,6 +71,9 @@ CONFIG_FILE="${HERMES_HOME}/.hermes/config.yaml"
 COMPANY_PROVIDERS="/home/hermes/config/company-providers.yaml"
 
 mkdir -p "${HERMES_HOME}/.hermes/skills" "${HERMES_HOME}/.hermes/logs"
+touch "${HERMES_HOME}/.hermes/.env"
+chown hermes:hermes "${HERMES_HOME}/.hermes/.env" 2>/dev/null || true
+chmod 600 "${HERMES_HOME}/.hermes/.env" 2>/dev/null || true
 fix_ownership
 
 # Provider 自动配置
@@ -296,7 +299,7 @@ BANNER
 
 if [ "${HERMES_MODE}" = "gateway" ]; then
     echo "[启动] Hermes Gateway 模式..."
-    exec su - hermes -c "cd /home/hermes/workspace && hermes gateway run"
+    exec su - hermes -c "mkdir -p /home/hermes/.hermes && touch /home/hermes/.hermes/.env && chmod 600 /home/hermes/.hermes/.env && cd /home/hermes/workspace && hermes gateway run"
 else
     echo "[启动] 交互模式 — 输入 hermes 开始对话"
     exec tail -f /dev/null
