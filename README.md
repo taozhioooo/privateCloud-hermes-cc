@@ -42,7 +42,7 @@
     │ 协议             │ SSH          │ SSH          │ SSH             │
     │ 认证方式         │ 密码/公钥    │ 密码/公钥    │ 公钥(自动)      │
     │ 默认密码         │ hermes       │ claude       │ —               │
-    │ 端口示例(zhangsan)│ 9201         │ 9301         │ 内部网络        │
+    │ 端口示例(seq 01) │ 10001        │ 11001        │ 内部网络        │
     │ 用途             │ 管理Hermes   │ 管理Claude   │ 任务调度        │
     └─────────────────┴──────────────┴──────────────┴─────────────────┘
 
@@ -75,12 +75,16 @@
 ### 第 3 步: 验证 SSH
 
     # 从外部 SSH 进入 Hermes 容器
-    ssh hermes@服务器IP -p 9201
+    ssh hermes@服务器IP -p 10001
     # 输入密码: hermes
 
     # 从外部 SSH 进入 Claude Code 容器
-    ssh claude@服务器IP -p 9301
+    ssh claude@服务器IP -p 11001
     # 输入密码: claude
+
+    # 如果已注入公钥，可直接免密登录
+    ssh -i ~/.ssh/id_ed25519 hermes@服务器IP -p 10001
+    ssh -i ~/.ssh/id_ed25519 claude@服务器IP -p 11001
 
     # 在 Hermes 容器内测试到 Claude Code 的连接
     docker exec hermes-zhangsan ssh claude@claude-zhangsan 'claude --version'
@@ -88,13 +92,25 @@
 
 ## 端口分配
 
-    员工         Hermes Gateway   Hermes SSH   Claude SSH
-    ──────────────────────────────────────────────────────
-    zhangsan     8701             9201         9301
-    lisi         8702             9202         9302
-    wangwu       8703             9203         9303
-    员工N        870N             920N         930N
-    最大范围     8770             9270         9370
+    每个容器独占 100 个主机端口
+    第 1 个端口用于 SSH
+    后面 98 个端口用于 Web 服务
+
+    Hermes:
+      seq 01  → 10001, 10002-10099
+      seq 04  → 10301, 10302-10399
+      seq 70  → 16901, 16902-16999
+
+    Claude Code:
+      seq 01  → 11001, 11002-11099
+      seq 04  → 11301, 11302-11399
+      seq 70  → 17901, 17902-17999
+
+    计算公式:
+      Hermes SSH      = 10001 + (seq-1) × 100
+      Hermes Web      = SSH+1  到 SSH+98
+      Claude SSH      = 11001 + (seq-1) × 100
+      Claude Web      = SSH+1  到 SSH+98
 
 
 ## SSH 使用场景
@@ -102,7 +118,7 @@
 ### 场景 1: 用户 SSH 进入 Hermes 容器
 
     # 直接 SSH
-    ssh hermes@192.168.1.100 -p 9201
+    ssh hermes@192.168.1.100 -p 10001
 
     # 进入后使用 Hermes
     hermes                              # 交互式对话
@@ -114,7 +130,7 @@
 ### 场景 2: 用户 SSH 进入 Claude Code 容器
 
     # 直接 SSH
-    ssh claude@192.168.1.100 -p 9301
+    ssh claude@192.168.1.100 -p 11001
 
     # 进入后使用 Claude Code
     claude                              # 交互式 REPL
@@ -149,26 +165,36 @@
 
 ## SSH 免密配置
 
-### 方式 1: 全局公钥（推荐）
+### 方式 1: 员工开通时注入公钥
+
+    # 传公钥文件路径
+    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 04 ~/.ssh/id_ed25519.pub
+
+    # 也可以直接传公钥内容
+    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 04 \
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host"
+
+    效果:
+      - 公钥会同时注入 Hermes 和 Claude Code
+      - 员工可用私钥直接免密 SSH 到两个容器
+
+### 方式 2: 全局公钥
 
     # 在 .env 中设置
     SSH_PUBLIC_KEY=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host
 
-    # 所有容器启动时自动导入此公钥
-    # 效果: 用户可用私钥免密登录所有容器
+    适合所有员工共用同一把公钥的场景
 
-### 方式 2: 逐个配置
+### 方式 3: 逐个复制
 
-    # 生成密钥（如果还没有）
+    # 生成密钥
     ssh-keygen -t ed25519
 
-    # 复制公钥到 Hermes 容器
-    ssh-copy-id -p 9201 hermes@服务器IP
+    # 手动分发到两个容器
+    ssh-copy-id -p 10001 hermes@服务器IP
+    ssh-copy-id -p 11001 claude@服务器IP
 
-    # 复制公钥到 Claude Code 容器
-    ssh-copy-id -p 9301 claude@服务器IP
-
-### 方式 3: Hermes → Claude Code 自动免密
+### 方式 4: Hermes → Claude Code 自动免密
 
     已自动配置，无需手动操作:
     1. Hermes 容器启动时自动生成 ed25519 密钥对
@@ -177,25 +203,38 @@
     4. Hermes 可直接 ssh claude@claude-xxx 免密连接
 
 
-## 镜像独立构建
+## 镜像构建与更新
 
-    # 单独构建 Hermes Agent
-    docker build -t hermes-agent:latest ./images/hermes-agent
+    日常使用 GitHub Actions 自动构建并推送镜像
 
-    # 单独构建 Claude Code
-    docker build -t claude-code:latest ./images/claude-code
+    镜像地址:
+      registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:latest
+      registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:latest
+
+    本地更新容器:
+      docker compose pull
+      docker compose up -d
 
 
 ## 添加新员工
 
-    ./scripts/provision_employee.sh <用户名> <域> <角色> <hermes端口> <claude端口> [ssh端口]
+    用法:
+    ./scripts/provision_employee.sh <用户名> <域> <角色> <序号(01-70)> [SSH公钥或公钥文件路径]
 
     示例:
-    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 8704 9304 9204
+    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 04 ~/.ssh/id_ed25519.pub
+    ./scripts/provision_employee.sh sunqi marketing product-manager 05
 
-    启动:
-    docker compose build hermes-zhaoliu claude-zhaoliu
+    启动新增员工容器:
+    docker compose pull hermes-zhaoliu claude-zhaoliu
     docker compose up -d hermes-zhaoliu claude-zhaoliu
+
+    生成结果:
+      seq 04 → Hermes 10301 / Claude 11301
+      如传入 SSH 公钥，两个容器都会自动支持免密登录
+
+    详细说明见:
+      /opt/workspace/hermes-docker-deploy/docs/employee-provisioning.md
 
 
 ## 资源配置
@@ -236,7 +275,7 @@
     docker exec claude-zhangsan claude auth status
 
     # 批量更新
-    docker compose build
+    docker compose pull
     docker compose up -d
 
 
