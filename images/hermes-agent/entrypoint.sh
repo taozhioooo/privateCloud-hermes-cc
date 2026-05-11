@@ -125,6 +125,11 @@ if [[ ! -f "${SENTINEL}" ]]; then
             val="${!var:-}"
             [[ -n "$val" ]] && printf '%s=%s\n' "$var" "$val"
         done
+        # all-in-one 单容器固定 gateway/API Server 端口。
+        # hermes-agent gateway 明确支持 API_SERVER_HOST/API_SERVER_PORT 环境变量；
+        # 写入 .env 可避免当前版本在 YAML extra.port 未生效时回退到默认 8642。
+        printf 'API_SERVER_HOST=127.0.0.1\n'
+        printf 'API_SERVER_PORT=8702\n'
     } > "${ENV_FILE}"
     chmod 600 "${ENV_FILE}"
 
