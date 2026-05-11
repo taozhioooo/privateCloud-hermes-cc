@@ -19,7 +19,9 @@ FROM node:23.11.0-bookworm-slim AS webui_build
 
 WORKDIR /src
 # 先拷 manifest,命中缓存层
-COPY hermes-web-ui/package.json hermes-web-ui/package-lock.json ./
+# 注:hermes-web-ui 的 .gitignore 排除了 package-lock.json,CI clone 没有 lock,
+# 所以用通配 copy (package*.json) 避免缺文件报错,npm install 会按 package.json 解析。
+COPY hermes-web-ui/package*.json ./
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm install --ignore-scripts && npm rebuild node-pty
 
