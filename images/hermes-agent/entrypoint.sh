@@ -153,6 +153,16 @@ skills:
     - /opt/skills/L3   # 角色层, 只读
 
 platforms:
+  # all-in-one 单容器模式: hermes-web-ui 与 Hermes gateway/API Server 在同一容器内。
+  # 必须使用 127.0.0.1:8702；若使用 docker service name(如 hermes-agent),
+  # web-ui 会把它判断为 remote profile 并跳过自动启动 gateway,导致左下角显示“未连接”。
+  api_server:
+    enabled: true
+    key: ''
+    cors_origins: '*'
+    extra:
+      host: 127.0.0.1
+      port: 8702
   dingtalk:
     enabled: false
 
