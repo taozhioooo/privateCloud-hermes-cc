@@ -29,9 +29,10 @@ RUN npm install -g @anthropic-ai/claude-code \
 RUN npm install -g typescript ts-node 2>/dev/null || true \
     && npm cache clean --force
 
-# ── 创建 claude 用户（非 root，UID=1000）──
-RUN groupadd -g 1000 claude \
-    && useradd -u 1000 -g claude -m -s /bin/bash claude \
+# ── 创建 claude 用户（非 root）──
+# node:20 基础镜像已有 node 用户(UID=1000)，重命名为 claude
+RUN usermod -l claude -d /home/claude -m node \
+    && groupmod -n claude node \
     && echo "claude:claude" | chpasswd \
     && echo "claude ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/claude \
     && chmod 0440 /etc/sudoers.d/claude
