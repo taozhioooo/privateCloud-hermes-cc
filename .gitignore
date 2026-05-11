@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.sample
 
 # Runtime data
 *.log
@@ -28,3 +29,10 @@ compose/rendered/*.yaml
 
 # Per-user env overrides
 users/*/.env
+
+# Upstream clones pulled on demand by CI (hermes-agent + hermes-web-ui)
+images/hermes-agent/hermes-agent/
+images/hermes-agent/hermes-web-ui/
+
+# 旧镜像构建文件备份 - 本地留痕,不入库
+images/hermes-agent.bak/

@@ -1,0 +1,10 @@
+# 构建上下文去掉无关体积
+**/.git
+**/.github
+**/node_modules
+**/.venv
+**/venv
+**/dist
+**/__pycache__
+**/.playwright
+hermes-agent.bak/

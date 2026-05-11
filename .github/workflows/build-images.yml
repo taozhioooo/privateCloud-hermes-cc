@@ -8,6 +8,15 @@ on:
       - images/claude-code/**
       - .github/workflows/build-images.yml
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "镜像 tag (默认 2026051101)"
+        required: false
+        default: "2026051101"
+
+env:
+  # 固定 tag,按需覆盖
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || '2026051101' }}
 
 jobs:
   build:
@@ -20,14 +29,39 @@ jobs:
             dockerfile: images/hermes-agent/Dockerfile
             context: images/hermes-agent
             image: gmsoft_hub/hermes-agent
+            # 需要在 build 前 clone 的上游仓库 (targetDir:repoURL:ref)
+            submodules: |
+              images/hermes-agent/hermes-agent https://github.com/NousResearch/hermes-agent.git main
+              images/hermes-agent/hermes-web-ui https://github.com/EKKOLearnAI/hermes-web-ui.git main
           - name: claude-code
             dockerfile: images/claude-code/Dockerfile
             context: images/claude-code
             image: gmsoft_hub/claude-code
+            submodules: ""
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Clone upstream build dependencies
+        if: matrix.submodules != ''
+        run: |
+          set -e
+          echo "${{ matrix.submodules }}" | while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            target=$(echo "$line" | awk '{print $1}')
+            repo=$(echo "$line"   | awk '{print $2}')
+            ref=$(echo "$line"    | awk '{print $3}')
+            ref=${ref:-main}
+            echo ">>> clone $repo ($ref) -> $target"
+            rm -rf "$target"
+            git clone --depth 1 --branch "$ref" "$repo" "$target"
+            # 去掉 .git 让构建上下文干净,不必要的元数据不进镜像
+            rm -rf "$target/.git"
+          done
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -39,23 +73,14 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.ACR_REGISTRY }}/${{ matrix.image }}
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=
-            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
-
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: |
+            ${{ secrets.ACR_REGISTRY }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ${{ secrets.ACR_REGISTRY }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

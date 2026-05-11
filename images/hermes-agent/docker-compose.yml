@@ -1,0 +1,68 @@
+# =============================================================================
+# Hermes Enterprise — 单员工容器 Compose 模板
+# 一份 .env 对应一个员工,100 端口段由 BASE 推出
+# 用法:
+#   cp .env.sample  .env.zhangsan   # 填写后
+#   docker compose --env-file .env.zhangsan -p hermes-zhangsan up -d
+# =============================================================================
+
+services:
+  hermes:
+    image: ${HERMES_IMAGE:-hermes-enterprise:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hermes-${EMPLOYEE_NAME}
+    hostname: hermes-${EMPLOYEE_NAME}
+    restart: unless-stopped
+
+    # 一个员工 100 端口: BASE..BASE+99  →  容器 8700..8799
+    #   BASE   = SSH
+    #   BASE+1 = web-ui
+    #   BASE+2..+9   = gateway / webhook
+    #   BASE+10..+99 = 临时 web 服务
+    ports:
+      - "${BASE}-${BASE_END}:8700-8799"
+
+    environment:
+      # 员工身份 (用于 SOUL.md 四层合并)
+      EMPLOYEE_NAME: ${EMPLOYEE_NAME}
+      EMPLOYEE_SEQ:  ${EMPLOYEE_SEQ}
+      DOMAIN:        ${DOMAIN:-default}
+      ROLE:          ${ROLE:-default}
+
+      # SSH 公钥 (多把用 \n 分隔)
+      SSH_PUBLIC_KEY: ${SSH_PUBLIC_KEY}
+
+      # 模型渠道 (首次启动写入 config.yaml / .env, sentinel 后用户接管)
+      HERMES_DEFAULT_PROVIDER: ${HERMES_DEFAULT_PROVIDER:-deepseek}
+      HERMES_DEFAULT_MODEL:    ${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}
+
+      # API keys (非空才写入 .env)
+      OPENROUTER_API_KEY:  ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY:      ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY:-}
+      DEEPSEEK_API_KEY:    ${DEEPSEEK_API_KEY:-}
+      GEMINI_API_KEY:      ${GEMINI_API_KEY:-}
+
+      # 可选: 钉钉
+      DINGTALK_CLIENT_ID:      ${DINGTALK_CLIENT_ID:-}
+      DINGTALK_CLIENT_SECRET:  ${DINGTALK_CLIENT_SECRET:-}
+      DINGTALK_ALLOWED_USERS:  ${DINGTALK_ALLOWED_USERS:-}
+
+    volumes:
+      # ── 员工私有持久化 ──
+      - ./data/${EMPLOYEE_NAME}/hermes:/opt/data          # ~/.hermes profile (config + skills L4 + sessions)
+      - ./data/${EMPLOYEE_NAME}/workspace:/workspace      # 工作目录 (= Windows Z:\)
+
+      # ── 四层技能库 (只读共享) ──
+      - ./skills/L1:/opt/skills/L1:ro
+      - ./skills/L2:/opt/skills/L2:ro
+      - ./skills/L3:/opt/skills/L3:ro
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8701/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
