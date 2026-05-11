@@ -17,6 +17,13 @@ FROM tianon/gosu:1.19-trixie AS gosu_source
 # ---------- stage: hermes-web-ui 构建 ----------
 FROM node:23.11.0-bookworm-slim AS webui_build
 
+# slim 镜像缺 python3 + 编译工具链,node-pty 找不到 linux-x64 prebuild 时
+# 会回退到 node-gyp rebuild,必须有 python + g++ 才能编译成功。
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        python3 python-is-python3 make g++ ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /src
 # 先拷 manifest,命中缓存层
 # 注:hermes-web-ui 的 .gitignore 排除了 package-lock.json,CI clone 没有 lock,
