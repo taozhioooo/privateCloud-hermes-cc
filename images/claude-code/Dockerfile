@@ -87,4 +87,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD claude --version || exit 1
 
 WORKDIR /home/claude/workspace
+# 以 root 启动，entrypoint 完成初始化后切换到 claude 用户运行 sshd
+USER root
 ENTRYPOINT ["/home/claude/entrypoint.sh"]

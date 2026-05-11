@@ -26,7 +26,7 @@ HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "SERVER_IP")
 # 1. SSH 配置
 # ══════════════════════════════════════════════════════════════════
 
-echo "claude:${CLAUDE_SSH_PASS}" | sudo chpasswd
+echo "claude:${CLAUDE_SSH_PASS}" | chpasswd
 mkdir -p "${CLAUDE_HOME}/.ssh"
 touch "${CLAUDE_HOME}/.ssh/authorized_keys"
 chown -R claude:claude "${CLAUDE_HOME}/.ssh"
@@ -150,4 +150,4 @@ BANNER
 # 5. 启动 SSH Server
 # ══════════════════════════════════════════════════════════════════
 
-exec sudo /usr/sbin/sshd -D -o "Port ${SSH_PORT:-22}"
+exec /usr/sbin/sshd -D -o "Port ${SSH_PORT:-22}"
