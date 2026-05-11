@@ -1,7 +1,8 @@
 #!/bin/bash
 # =============================================================================
 # Claude Code Container — Entrypoint
-# 启动时打印完整使用信息
+# 支持通过 DEEPSEEK_MODEL 环境变量配置模型
+# 支持 SSH 接入 和 docker exec 两种调用方式
 # =============================================================================
 
 set -e
@@ -15,6 +16,9 @@ WEB_PORT_START="${WEB_PORT_START:-11002}"
 WEB_PORT_END="${WEB_PORT_END:-11099}"
 CLAUDE_SSH_PASS="${CLAUDE_SSH_PASS:-claude}"
 HERMES_HOST="${HERMES_HOST:-not configured}"
+
+# 模型配置：优先 DEEPSEEK_MODEL，其次 CLAUDE_MODEL，默认 deepseek-v4-pro
+CLAUDE_MODEL="${DEEPSEEK_MODEL:-${CLAUDE_MODEL:-deepseek-v4-pro}}"
 
 HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "SERVER_IP")
 
@@ -45,35 +49,56 @@ fi
 [ -f "${CLAUDE_HOME}/.ssh/authorized_keys" ] && chmod 600 "${CLAUDE_HOME}/.ssh/authorized_keys"
 
 # ══════════════════════════════════════════════════════════════════
-# 2. API Key
+# 2. API Key 配置
 # ══════════════════════════════════════════════════════════════════
 
+# Anthropic key（如果有）
 if [ -n "$ANTHROPIC_API_KEY" ]; then
-    echo "export ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" >> "${CLAUDE_HOME}/.bashrc"
-    export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"
+    grep -q "ANTHROPIC_API_KEY" "${CLAUDE_HOME}/.bashrc" 2>/dev/null || \
+        echo "export ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" >> "${CLAUDE_HOME}/.bashrc"
+fi
+
+# DeepSeek key（如果有，写入 ANTHROPIC_API_KEY 供 claude 使用自定义 endpoint）
+if [ -n "$DEEPSEEK_API_KEY" ]; then
+    grep -q "DEEPSEEK_API_KEY" "${CLAUDE_HOME}/.bashrc" 2>/dev/null || \
+        echo "export DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}" >> "${CLAUDE_HOME}/.bashrc"
 fi
 
 # ══════════════════════════════════════════════════════════════════
-# 3. Claude Code 配置
+# 3. Claude Code settings.json — 写入模型配置
 # ══════════════════════════════════════════════════════════════════
 
 mkdir -p "${CLAUDE_HOME}/.claude"
 
-if [ ! -f "${CLAUDE_HOME}/.claude/settings.json" ]; then
-    cat > "${CLAUDE_HOME}/.claude/settings.json" << 'EOF'
+# 每次启动都更新 model 字段，确保与环境变量一致
+# 如果 settings.json 已存在，用 node 合并（保留 permissions 等其他字段）
+if [ -f "${CLAUDE_HOME}/.claude/settings.json" ]; then
+    node -e "
+const fs = require('fs');
+const path = '${CLAUDE_HOME}/.claude/settings.json';
+let s = {};
+try { s = JSON.parse(fs.readFileSync(path, 'utf8')); } catch(e) {}
+s.model = '${CLAUDE_MODEL}';
+fs.writeFileSync(path, JSON.stringify(s, null, 2) + '\n');
+console.log('[model] settings.json updated: model=' + s.model);
+"
+else
+    cat > "${CLAUDE_HOME}/.claude/settings.json" << EOF
 {
+  "model": "${CLAUDE_MODEL}",
   "permissions": {
-    "allow": ["Read","Edit","Write","Bash","WebSearch","WebFetch"],
-    "deny": ["Bash(rm -rf /)","Bash(:(){ :|:& };:)"]
+    "allow": ["Read", "Edit", "Write", "Bash", "WebSearch", "WebFetch"],
+    "deny": ["Bash(rm -rf /)", "Bash(:(){ :|:& };:)"]
   }
 }
 EOF
+    echo "[model] settings.json created: model=${CLAUDE_MODEL}"
 fi
 
 mkdir -p "${CLAUDE_HOME}/workspace"
 
 # ══════════════════════════════════════════════════════════════════
-# 4. 启动 SSH + 打印信息
+# 4. 打印启动信息
 # ══════════════════════════════════════════════════════════════════
 
 CLAUDE_VERSION=$(claude --version 2>/dev/null || echo "unknown")
@@ -89,6 +114,7 @@ cat << BANNER
 ║                                                                  ║
 ║  员工:  ${EMPLOYEE_NAME} (序号: ${EMPLOYEE_SEQ})
 ║  版本:  Claude Code ${CLAUDE_VERSION}  |  Node.js ${NODE_VERSION}
+║  模型:  ${CLAUDE_MODEL}
 ║                                                                  ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
@@ -99,44 +125,29 @@ cat << BANNER
 ║  │                                                              │ ║
 ║  └──────────────────────────────────────────────────────────────┘ ║
 ║                                                                  ║
-║  ┌─ Web 服务端口 ──────────────────────────────────────────────┐ ║
+║  ┌─ docker exec 调用 ──────────────────────────────────────────┐ ║
 ║  │                                                              │ ║
-║  │  可用端口: ${WEB_PORT_START} - ${WEB_PORT_END} (共 98 个)
-║  │                                                              │ ║
-║  │  使用方法 (容器内绑定 0.0.0.0):                              │ ║
-║  │    python3 -m http.server ${WEB_PORT_START} --bind 0.0.0.0
-║  │    npx serve -l ${WEB_PORT_START}
-║  │    npm run dev -- -p ${WEB_PORT_START}
-║  │                                                              │ ║
-║  │  局域网访问: http://${HOST_IP}:${WEB_PORT_START}
+║  │  docker exec -u claude claude-${EMPLOYEE_NAME} \
+║  │    claude -p "任务描述"
 ║  │                                                              │ ║
 ║  └──────────────────────────────────────────────────────────────┘ ║
 ║                                                                  ║
-║  ┌─ Claude Code 使用 ──────────────────────────────────────────┐ ║
-║  │                                                              │ ║
-║  │  claude                         交互式 REPL                  │ ║
-║  │  claude -p "任务描述"           非交互模式 (print mode)      │ ║
-║  │  claude auth status             认证状态                     │ ║
-║  │  claude --version               版本号                       │ ║
-║  │                                                              │ ║
-║  │  编码示例:                                                    │ ║
-║  │  claude -p "写一个 FastAPI 项目"                             │ ║
-║  │  claude -p "分析 src/ 下的代码并生成文档"                    │ ║
-║  │  claude -p "修复所有 lint 错误" --max-turns 10              │ ║
-║  │                                                              │ ║
+║  ┌─ Web 服务端口 ──────────────────────────────────────────────┐ ║
+║  │  可用端口: ${WEB_PORT_START} - ${WEB_PORT_END}
+║  │  局域网访问: http://${HOST_IP}:${WEB_PORT_START}
 ║  └──────────────────────────────────────────────────────────────┘ ║
 ║                                                                  ║
 ║  ┌─ 从 Hermes 容器调用 ────────────────────────────────────────┐ ║
-║  │                                                              │ ║
-║  │  Hermes 容器已配置免密 SSH 到本容器                          │ ║
-║  │  Hermes 内部调用:                                            │ ║
-║  │    ssh claude@${HERMES_HOST} "claude -p '任务'"              │ ║
-║  │                                                              │ ║
+║  │  ssh claude@${HERMES_HOST} "claude -p '任务'"
+║  │  docker exec -u claude claude-${EMPLOYEE_NAME} claude -p "任务"
 ║  └──────────────────────────────────────────────────────────────┘ ║
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
 
 BANNER
 
-# 启动 SSH Server
-exec sudo /usr/sbin/sshd -D
+# ══════════════════════════════════════════════════════════════════
+# 5. 启动 SSH Server
+# ══════════════════════════════════════════════════════════════════
+
+exec sudo /usr/sbin/sshd -D -o "Port ${SSH_PORT:-22}"

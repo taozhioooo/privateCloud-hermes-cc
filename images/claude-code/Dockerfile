@@ -1,9 +1,10 @@
 # =============================================================================
 # Claude Code CLI — 独立镜像
 # 包含: SSH Server(用户接入 + Hermes远程调用) + Claude Code CLI
+# 模型通过 DEEPSEEK_MODEL 环境变量配置，写入 settings.json
 # =============================================================================
 
-FROM ubuntu:24.04
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:20
 
 LABEL maintainer="Hermes Enterprise Platform"
 LABEL description="Claude Code CLI — SSH Accessible Coding Agent"
@@ -13,18 +14,11 @@ ENV TZ=Asia/Shanghai
 
 # ── 系统依赖 ──
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget git ca-certificates gnupg lsb-release \
-    python3 python3-pip python3-venv \
+    curl wget git ca-certificates \
     vim nano tmux jq htop \
-    build-essential \
     dnsutils iputils-ping net-tools \
     openssh-server openssh-client \
     sudo \
-    && rm -rf /var/lib/apt/lists/*
-
-# ── 安装 Node.js 22.x LTS ──
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # ── 安装 Claude Code CLI ──
@@ -35,11 +29,20 @@ RUN npm install -g @anthropic-ai/claude-code \
 RUN npm install -g typescript ts-node 2>/dev/null || true \
     && npm cache clean --force
 
-# ── 创建 claude 用户 ──
-RUN groupadd -r claude \
-    && useradd -r -g claude -m -s /bin/bash -G sudo claude \
+# ── 创建 claude 用户（非 root，UID=1000）──
+RUN groupadd -g 1000 claude \
+    && useradd -u 1000 -g claude -m -s /bin/bash claude \
     && echo "claude:claude" | chpasswd \
-    && echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/claude
+    && echo "claude ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/claude \
+    && chmod 0440 /etc/sudoers.d/claude
+
+# ── SSH Server 配置 ──
+RUN mkdir -p /run/sshd \
+    && ssh-keygen -A \
+    && sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
+    && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
+    && sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
+    && echo "AllowUsers claude" >> /etc/ssh/sshd_config
 
 USER claude
 WORKDIR /home/claude
@@ -48,13 +51,14 @@ WORKDIR /home/claude
 RUN mkdir -p \
     /home/claude/.claude \
     /home/claude/.ssh \
-    /home/claude/workspace
+    /home/claude/workspace \
+    && chmod 700 /home/claude/.ssh
 
-RUN chmod 700 /home/claude/.ssh
-
-# ── Claude Code 默认权限（允许远程调用时自动审批）──
+# ── Claude Code 默认 settings.json
+# model 字段在 entrypoint 运行时由 DEEPSEEK_MODEL 环境变量覆盖写入
 RUN cat > /home/claude/.claude/settings.json << 'EOF'
 {
+  "model": "deepseek-v4-pro",
   "permissions": {
     "allow": [
       "Read",
@@ -75,15 +79,6 @@ EOF
 # ── 启动脚本 ──
 COPY --chown=claude:claude scripts/entrypoint-claude.sh /home/claude/entrypoint.sh
 RUN chmod +x /home/claude/entrypoint.sh
-
-# ── SSH Server 配置 ──
-USER root
-RUN mkdir -p /run/sshd \
-    && ssh-keygen -A \
-    && sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config \
-    && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
-    && echo "AllowUsers claude" >> /etc/ssh/sshd_config
 
 EXPOSE 22
 

@@ -223,7 +223,7 @@ fi
 # 4. 启动 SSH + 打印信息
 # ══════════════════════════════════════════════════════════════════
 
-sudo /usr/sbin/sshd
+sudo /usr/sbin/sshd -o "Port ${SSH_PORT:-22}"
 
 cat << BANNER
 

@@ -20,3 +20,11 @@ node_modules/
 
 # OS
 .DS_Store
+
+# Rendered compose fragments (generated from users/users.yaml)
+compose/rendered/*.yml
+compose/rendered/*.yaml
+!compose/rendered/.gitkeep
+
+# Per-user env overrides
+users/*/.env

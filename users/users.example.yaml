@@ -1,0 +1,94 @@
+# =============================================================================
+# Hermes 用户注册表示例
+# =============================================================================
+# 复制本文件到 users.yaml 即可开始:
+#   cp users/users.example.yaml users/users.yaml
+#
+# 字段说明:
+#   version          - 注册表格式版本 (固定为 1)
+#   defaults         - 所有用户共享的默认值
+#     image_hermes   - Hermes 镜像地址
+#     image_claude   - Claude Code 镜像地址
+#     resources      - CPU / 内存限制 (可被单用户 resources 覆盖)
+#     hermes_mode    - Hermes 运行模式 (gateway / standalone)
+#   ports            - 端口分配规则
+#     hermes_base    - Hermes SSH 起始端口 (seq=1 时的值)
+#     claude_base    - Claude SSH 起始端口 (seq=1 时的值)
+#     step           - 每个序号占用的端口数 (默认 100)
+#     range_size     - 每用户端口范围大小 (默认 100)
+#   users            - 用户列表
+#     name           - 用户名 (小写字母+数字+短横线)
+#     seq            - 序号 (1-70), 决定端口分配
+#     domain         - 业务域 (engineering / marketing / finance...)
+#     role           - 角色 (senior-engineer / product-manager...)
+#     ssh_public_keys- SSH 公钥列表 (可选, 多个公钥都会被注入)
+#     resources      - 单用户资源覆盖 (可选)
+#     enabled        - 是否启用 (false 时不会被渲染)
+#
+# 端口计算公式 (seq=N 时):
+#   Hermes SSH:  hermes_base + (N-1) * step         = 10001 + (N-1)*100
+#   Hermes Web:  [hermes_ssh + 1, hermes_ssh + 98]
+#   Claude SSH:  claude_base + (N-1) * step         = 11001 + (N-1)*100
+#   Claude Web:  [claude_ssh + 1, claude_ssh + 98]
+# =============================================================================
+
+version: 1
+
+defaults:
+  image_hermes: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:latest
+  image_claude: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:latest
+  resources:
+    hermes:
+      cpus: "2.0"
+      memory: "2G"
+    claude:
+      cpus: "4.0"
+      memory: "4G"
+  hermes_mode: gateway
+
+ports:
+  hermes_base: 10001
+  claude_base: 11001
+  step: 100
+  range_size: 100
+
+users:
+  # 最小字段示例
+  - name: zhangsan
+    seq: 1
+    domain: engineering
+    role: senior-engineer
+    ssh_public_keys: []
+    enabled: true
+
+  # 带 SSH 公钥示例
+  - name: lisi
+    seq: 2
+    domain: marketing
+    role: product-manager
+    ssh_public_keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIxxxxxxxxxxxxxxxxxxxxxxx lisi@laptop"
+    enabled: true
+
+  # 资源覆盖示例 (高配)
+  - name: wangwu
+    seq: 3
+    domain: data
+    role: senior-engineer
+    ssh_public_keys: []
+    resources:
+      hermes:
+        cpus: "4.0"
+        memory: "4G"
+      claude:
+        cpus: "8.0"
+        memory: "8G"
+    enabled: true
+
+  # 临时停用示例
+  - name: zhaoliu
+    seq: 4
+    domain: finance
+    role: analyst
+    ssh_public_keys: []
+    enabled: false
