@@ -292,6 +292,34 @@ rm -f "${PROVIDER_STATE}"
 SELECTED_PROVIDER="${SELECTED_PROVIDER:-${HERMES_DEFAULT_PROVIDER:-deepseek}}"
 SELECTED_MODEL="${SELECTED_MODEL:-${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}}"
 
+# 将首次生成/用户维护的 .env 导出到当前进程环境。
+# hermes-web-ui 的 GatewayManager 启动 `hermes gateway run` 时继承 process.env；
+# 仅写入 /opt/data/.env 不会自动进入子进程环境，导致 API_SERVER_PORT 回退默认 8642。
+# 这里用 Python 安全解析 key=value，避免 source .env 执行任意 shell。
+if [[ -f "${ENV_FILE}" ]]; then
+    while IFS= read -r kv; do
+        [[ -z "${kv}" ]] && continue
+        export "${kv}"
+    done < <(ENV_FILE="${ENV_FILE}" python3 - <<'PY'
+import os, re
+from pathlib import Path
+p = Path(os.environ['ENV_FILE'])
+for raw in p.read_text(encoding='utf-8').splitlines():
+    line = raw.strip()
+    if not line or line.startswith('#') or '=' not in line:
+        continue
+    key, val = line.split('=', 1)
+    key = key.strip()
+    if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', key):
+        continue
+    val = val.strip()
+    if (len(val) >= 2) and ((val[0] == val[-1]) and val[0] in {'"', "'"}):
+        val = val[1:-1]
+    print(f'{key}={val}')
+PY
+    )
+fi
+
 # ══════════════════════════════════════════════════════════════════
 # 4. 四层 SOUL.md 合并
 # ══════════════════════════════════════════════════════════════════
