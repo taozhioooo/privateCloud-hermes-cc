@@ -203,11 +203,9 @@ for var in extra_env_vars:
     if var and var not in seen and os.environ.get(var):
         lines.append(f"{var}={os.environ[var]}")
         seen.add(var)
-for var, val in (
-    ("API_SERVER_HOST", "127.0.0.1"),
-    ("API_SERVER_PORT", "8702"),
-    ("HERMES_GATEWAY_FIXED_PORT", "true"),
-):
+# 使用 hermes-agent 官方默认 API server 端口 8642。
+# 容器外如需企业连续端口规划，可将宿主机 BASE+2 映射到容器 8642。
+for var, val in (("API_SERVER_HOST", "127.0.0.1"),):
     lines.append(f"{var}={val}")
 env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 env_file.chmod(0o600)
@@ -228,7 +226,7 @@ cfg = {
             "enabled": True,
             "key": "",
             "cors_origins": "*",
-            "extra": {"host": "127.0.0.1", "port": 8702},
+            "extra": {"host": "127.0.0.1", "port": 8642},
         },
         "dingtalk": {"enabled": False},
     },
@@ -298,7 +296,6 @@ SELECTED_MODEL="${SELECTED_MODEL:-${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}}"
 
 # 将首次生成/用户维护的 .env 导出到当前进程环境。
 # hermes-web-ui 的 GatewayManager 启动 `hermes gateway run` 时继承 process.env；
-# 仅写入 /opt/data/.env 不会自动进入子进程环境，导致 API_SERVER_PORT 回退默认 8642。
 # 这里用 Python 安全解析 key=value，避免 source .env 执行任意 shell。
 if [[ -f "${ENV_FILE}" ]]; then
     while IFS= read -r kv; do
@@ -374,7 +371,7 @@ cat <<BANNER
 ║  容器内端口:
 ║   ${SSH_PORT}       SSH
 ║   ${WEBUI_PORT}     hermes-web-ui
-║   8702-8709  gateway / webhook
+║   8642       gateway / API server (default)
 ║   8710-8799  临时 web 服务 (bind 0.0.0.0)
 ║
 ║  宿主端口(请在 compose 中按员工 seq 映射):

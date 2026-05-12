@@ -5,7 +5,7 @@
 # 内含:       hermes-agent (uv 安装)  +  hermes-web-ui  +  openssh-server
 # 数据持久化: /opt/data  /workspace  (docker volume 挂载)
 # 只读技能卷: /opt/skills/L1  /opt/skills/L2  /opt/skills/L3
-# 对外端口:   8700 SSH  8701 WebUI  8702-8709 gateway  8710-8799 临时服务
+# 对外端口:   8700 SSH  8701 WebUI  8642 gateway/API server  8710-8799 临时服务
 # =============================================================================
 
 # ---------- stage: uv 二进制 ----------
@@ -32,11 +32,9 @@ COPY hermes-web-ui/package*.json ./
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm install --ignore-scripts && npm rebuild node-pty
 
-# 拷剩余源码,应用企业 all-in-one 固定 gateway 端口补丁,构建 dist/
+# 拷剩余源码,构建 dist/
 COPY hermes-web-ui/ ./
-COPY patches/hermes-web-ui-fixed-gateway-port.patch /tmp/hermes-web-ui-fixed-gateway-port.patch
-RUN patch -p1 < /tmp/hermes-web-ui-fixed-gateway-port.patch \
- && npm run build && npm prune --omit=dev
+RUN npm run build && npm prune --omit=dev
 
 # ---------- stage: 最终运行镜像 ----------
 FROM ubuntu:24.04
@@ -177,10 +175,10 @@ COPY --chmod=0755 entrypoint.sh /usr/local/bin/hermes-entrypoint.sh
 # ║  端口声明  (宿主机映射在 compose 里)                             ║
 # ║   8700       SSH                                                ║
 # ║   8701       hermes-web-ui                                      ║
-# ║   8702-8709  hermes gateway / webhook                           ║
+# ║   8642       hermes gateway / API server (default)               ║
 # ║   8710-8799  员工临时 web 服务                                   ║
 # ╚═════════════════════════════════════════════════════════════════╝
-EXPOSE 8700-8799
+EXPOSE 8700-8799 8642
 
 VOLUME [ "/opt/data", "/workspace" ]
 

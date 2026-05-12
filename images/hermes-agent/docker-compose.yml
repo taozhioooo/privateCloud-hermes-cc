@@ -16,13 +16,16 @@ services:
     hostname: hermes-${EMPLOYEE_NAME}
     restart: unless-stopped
 
-    # 一个员工 100 端口: BASE..BASE+99  →  容器 8700..8799
-    #   BASE   = SSH
-    #   BASE+1 = web-ui
-    #   BASE+2..+9   = gateway / webhook
-    #   BASE+10..+99 = 临时 web 服务
+    # 一个员工 100 端口: BASE..BASE+99
+    #   BASE    -> 8700 SSH
+    #   BASE+1  -> 8701 web-ui
+    #   BASE+2  -> 8642 hermes gateway / API server (官方默认端口)
+    #   BASE+10..+99 -> 8710..8799 临时 web 服务
     ports:
-      - "${BASE}-${BASE_END}:8700-8799"
+      - "${BASE}:8700"
+      - "${BASE_PLUS_1}:8701"
+      - "${BASE_PLUS_2}:8642"
+      - "${BASE_PLUS_10}-${BASE_END}:8710-8799"
 
     environment:
       # 员工身份 (用于 SOUL.md 四层合并)
@@ -34,16 +37,20 @@ services:
       # SSH 公钥 (多把用 \n 分隔)
       SSH_PUBLIC_KEY: ${SSH_PUBLIC_KEY}
 
-      # 模型渠道 (首次启动写入 config.yaml / .env, sentinel 后用户接管)
-      HERMES_DEFAULT_PROVIDER: ${HERMES_DEFAULT_PROVIDER:-deepseek}
-      HERMES_DEFAULT_MODEL:    ${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}
+      # 模型渠道 (首次启动从 company-providers.yaml 读取,写入 config.yaml / .env)
+      HERMES_DEFAULT_PROVIDER: ${HERMES_DEFAULT_PROVIDER:-}
+      HERMES_DEFAULT_MODEL:    ${HERMES_DEFAULT_MODEL:-}
+      COMPANY_PROVIDERS_FILE:  ${COMPANY_PROVIDERS_FILE:-}
 
       # API keys (非空才写入 .env)
       OPENROUTER_API_KEY:  ${OPENROUTER_API_KEY:-}
       OPENAI_API_KEY:      ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY:-}
       DEEPSEEK_API_KEY:    ${DEEPSEEK_API_KEY:-}
+      DASHSCOPE_API_KEY:   ${DASHSCOPE_API_KEY:-}
+      MINIMAX_API_KEY:     ${MINIMAX_API_KEY:-}
       GEMINI_API_KEY:      ${GEMINI_API_KEY:-}
+      CUSTOM_API_KEY:      ${CUSTOM_API_KEY:-}
 
       # 可选: 钉钉
       DINGTALK_CLIENT_ID:      ${DINGTALK_CLIENT_ID:-}
