@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "镜像 tag (默认 2025051201)"
+        description: "镜像 tag (默认 2025051202)"
         required: false
-        default: "2025051201"
+        default: "2025051202"
 
 env:
   # 固定 tag,按需覆盖
-  IMAGE_TAG: ${{ github.event.inputs.image_tag || '2025051201' }}
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || '2025051202' }}
 
 jobs:
   build:

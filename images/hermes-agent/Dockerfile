@@ -121,6 +121,16 @@ RUN cd web    && npm run build \
 # 可编辑安装 hermes-agent 本体(快,不解析依赖)
 RUN uv pip install --no-cache-dir --no-deps -e "."
 
+# -------- 初始化 git 仓库,使 hermes update 可用 --------
+# hermes update 依赖 PROJECT_ROOT/.git 存在,并通过 git fetch/pull origin main 拉取更新。
+# CI 构建时 .git 被删除以减小 context,这里重新初始化并指向上游。
+RUN git init \
+ && git remote add origin https://github.com/NousResearch/hermes-agent.git \
+ && git add -A \
+ && git -c user.email="build@hermes" -c user.name="hermes-build" \
+    commit -m "docker image build" --allow-empty \
+ && git branch -M main
+
 # ╔═════════════════════════════════════════════════════════════════╗
 # ║  hermes-web-ui  — 从 build stage 拷构建产物                     ║
 # ╚═════════════════════════════════════════════════════════════════╝
