@@ -19,7 +19,7 @@ services:
     # 一个员工 100 端口: BASE..BASE+99
     #   BASE    -> 8700 SSH
     #   BASE+1  -> 8701 web-ui
-    #   BASE+2  -> 8642 hermes gateway / API server (官方默认端口)
+    #   BASE+2  -> 8642 hermes gateway / API server (官方默认端口,容器内监听 0.0.0.0)
     #   BASE+10..+99 -> 8710..8799 临时 web 服务
     ports:
       - "${BASE}:8700"

@@ -140,6 +140,7 @@ if [[ ! -f "${SENTINEL}" ]]; then
     PROVIDER_STATE="${PROVIDER_STATE}" \
     python3 - <<'PY'
 import os
+import secrets
 from pathlib import Path
 
 try:
@@ -204,9 +205,20 @@ for var in extra_env_vars:
         lines.append(f"{var}={os.environ[var]}")
         seen.add(var)
 # 使用 hermes-agent 官方默认 API server 端口 8642。
-# 容器外如需企业连续端口规划，可将宿主机 BASE+2 映射到容器 8642。
-for var, val in (("API_SERVER_HOST", "127.0.0.1"),):
-    lines.append(f"{var}={val}")
+# 为了让 Docker 端口映射 (宿主机 BASE+2 -> 容器 8642) 可用,
+# API server 需要监听 0.0.0.0。Hermes 在非 localhost 监听时要求 API_SERVER_KEY,
+# 因此首次启动自动生成一个强随机 key。
+api_server_host = os.environ.get("API_SERVER_HOST", "0.0.0.0")
+api_server_port = os.environ.get("API_SERVER_PORT", "8642")
+api_server_key = os.environ.get("API_SERVER_KEY") or secrets.token_hex(32)
+for var, val in (
+    ("API_SERVER_HOST", api_server_host),
+    ("API_SERVER_PORT", api_server_port),
+    ("API_SERVER_KEY", api_server_key),
+):
+    if var not in seen:
+        lines.append(f"{var}={val}")
+        seen.add(var)
 env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 env_file.chmod(0o600)
 
@@ -224,9 +236,9 @@ cfg = {
     "platforms": {
         "api_server": {
             "enabled": True,
-            "key": "",
+            "key": api_server_key,
             "cors_origins": "*",
-            "extra": {"host": "127.0.0.1", "port": 8642},
+            "extra": {"host": api_server_host, "port": int(api_server_port)},
         },
         "dingtalk": {"enabled": False},
     },
@@ -371,7 +383,7 @@ cat <<BANNER
 ║  容器内端口:
 ║   ${SSH_PORT}       SSH
 ║   ${WEBUI_PORT}     hermes-web-ui
-║   8642       gateway / API server (default)
+║   8642       gateway / API server (default, bind 0.0.0.0)
 ║   8710-8799  临时 web 服务 (bind 0.0.0.0)
 ║
 ║  宿主端口(请在 compose 中按员工 seq 映射):
