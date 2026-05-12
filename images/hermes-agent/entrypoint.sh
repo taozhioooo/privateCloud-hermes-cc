@@ -222,6 +222,10 @@ for var, val in (
 env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 env_file.chmod(0o600)
 
+dingtalk_enabled = bool(
+    os.environ.get("DINGTALK_CLIENT_ID") and os.environ.get("DINGTALK_CLIENT_SECRET")
+)
+
 cfg = {
     "provider": selected,
     "model": selected_model,
@@ -243,7 +247,7 @@ cfg = {
             # .env 中 API_SERVER_HOST=0.0.0.0 控制,从而支持 Docker 端口映射。
             "extra": {},
         },
-        "dingtalk": {"enabled": False},
+        "dingtalk": {"enabled": dingtalk_enabled, "extra": {}},
     },
     "employee": {
         "name": os.environ.get("EMPLOYEE_NAME", "unknown"),
