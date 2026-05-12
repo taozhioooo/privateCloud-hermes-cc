@@ -203,7 +203,11 @@ for var in extra_env_vars:
     if var and var not in seen and os.environ.get(var):
         lines.append(f"{var}={os.environ[var]}")
         seen.add(var)
-for var, val in (("API_SERVER_HOST", "127.0.0.1"), ("API_SERVER_PORT", "8702")):
+for var, val in (
+    ("API_SERVER_HOST", "127.0.0.1"),
+    ("API_SERVER_PORT", "8702"),
+    ("HERMES_GATEWAY_FIXED_PORT", "true"),
+):
     lines.append(f"{var}={val}")
 env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 env_file.chmod(0o600)

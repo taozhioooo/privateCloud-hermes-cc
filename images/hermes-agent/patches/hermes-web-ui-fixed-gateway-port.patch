@@ -1,0 +1,21 @@
+diff --git a/packages/server/src/services/hermes/gateway-manager.ts b/packages/server/src/services/hermes/gateway-manager.ts
+--- a/packages/server/src/services/hermes/gateway-manager.ts
++++ b/packages/server/src/services/hermes/gateway-manager.ts
+@@ -329,6 +329,17 @@
+   private async resolvePort(name: string): Promise<{ port: number; host: string }> {
+     let { port, host } = this.readProfilePort(name)
+ 
++    // Enterprise all-in-one containers use fixed internal port mappings (8700-8799).
++    // Docker-published ports can make bind-based availability probes report the
++    // intended internal gateway port as occupied, causing an unwanted fallback to
++    // 8642.  When explicitly enabled, trust config.yaml/.env and skip automatic
++    // port reassignment.
++    if (process.env.HERMES_GATEWAY_FIXED_PORT === 'true') {
++      this.writeProfilePort(name, port, host)
++      this.allocatedPorts.add(port)
++      return { port, host }
++    }
++
+     // 收集已占用端口：正在运行的网关 + 本次启动已分配的端口
+     const usedPorts = new Set<number>(this.allocatedPorts)
+     for (const gw of Array.from(this.gateways.values())) {

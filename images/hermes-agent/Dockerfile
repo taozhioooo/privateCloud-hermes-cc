@@ -32,9 +32,11 @@ COPY hermes-web-ui/package*.json ./
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm install --ignore-scripts && npm rebuild node-pty
 
-# 拷剩余源码,构建 dist/
+# 拷剩余源码,应用企业 all-in-one 固定 gateway 端口补丁,构建 dist/
 COPY hermes-web-ui/ ./
-RUN npm run build && npm prune --omit=dev
+COPY patches/hermes-web-ui-fixed-gateway-port.patch /tmp/hermes-web-ui-fixed-gateway-port.patch
+RUN patch -p1 < /tmp/hermes-web-ui-fixed-gateway-port.patch \
+ && npm run build && npm prune --omit=dev
 
 # ---------- stage: 最终运行镜像 ----------
 FROM ubuntu:24.04
