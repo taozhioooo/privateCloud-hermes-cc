@@ -238,7 +238,10 @@ cfg = {
             "enabled": True,
             "key": api_server_key,
             "cors_origins": "*",
-            "extra": {"host": api_server_host, "port": int(api_server_port)},
+            # 不在 config.yaml.extra 写 host/port: 让 hermes-web-ui 按本地默认
+            # 127.0.0.1:8642 自动启动 gateway；实际 gateway 绑定地址由
+            # .env 中 API_SERVER_HOST=0.0.0.0 控制,从而支持 Docker 端口映射。
+            "extra": {},
         },
         "dingtalk": {"enabled": False},
     },
@@ -383,7 +386,7 @@ cat <<BANNER
 ║  容器内端口:
 ║   ${SSH_PORT}       SSH
 ║   ${WEBUI_PORT}     hermes-web-ui
-║   8642       gateway / API server (default, bind 0.0.0.0)
+║   8642       gateway / API server (default, published via 0.0.0.0)
 ║   8710-8799  临时 web 服务 (bind 0.0.0.0)
 ║
 ║  宿主端口(请在 compose 中按员工 seq 映射):
