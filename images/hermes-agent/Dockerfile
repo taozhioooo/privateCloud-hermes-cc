@@ -21,7 +21,7 @@ FROM node:23.11.0-bookworm-slim AS webui_build
 # 会回退到 node-gyp rebuild,必须有 python + g++ 才能编译成功。
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        python3 python-is-python3 make g++ ca-certificates curl \
+        python3 python-is-python3 make g++ ca-certificates curl patch \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
