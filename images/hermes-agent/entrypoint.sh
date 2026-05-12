@@ -28,9 +28,22 @@ EMPLOYEE_SEQ="${EMPLOYEE_SEQ:-0}"
 DOMAIN="${DOMAIN:-default}"
 ROLE="${ROLE:-default}"
 
-# ───── 默认模型渠道 ─────
-HERMES_DEFAULT_PROVIDER="${HERMES_DEFAULT_PROVIDER:-deepseek}"
-HERMES_DEFAULT_MODEL="${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}"
+# ───── 模型渠道配置文件 ─────
+# 首次启动时从该 YAML 读取可用 provider 列表、默认模型、API key 环境变量名。
+# 优先使用 /opt/data/company-providers.yaml，便于运维通过 volume 覆盖；否则用镜像内置默认配置。
+COMPANY_PROVIDERS_FILE="${COMPANY_PROVIDERS_FILE:-}"
+if [[ -z "${COMPANY_PROVIDERS_FILE}" ]]; then
+    if [[ -f "${HERMES_HOME}/company-providers.yaml" ]]; then
+        COMPANY_PROVIDERS_FILE="${HERMES_HOME}/company-providers.yaml"
+    else
+        COMPANY_PROVIDERS_FILE="/opt/hermes/company-providers.yaml"
+    fi
+fi
+# 兼容覆盖：如显式传入 HERMES_DEFAULT_PROVIDER / HERMES_DEFAULT_MODEL，则优先于配置文件选择结果。
+HERMES_DEFAULT_PROVIDER="${HERMES_DEFAULT_PROVIDER:-}"
+HERMES_DEFAULT_MODEL="${HERMES_DEFAULT_MODEL:-}"
+SELECTED_PROVIDER="${HERMES_DEFAULT_PROVIDER:-}"
+SELECTED_MODEL="${HERMES_DEFAULT_MODEL:-}"
 
 # ───── Web UI / gateway 端口(容器内固定) ─────
 SSH_PORT=8700
@@ -98,93 +111,186 @@ fi
 # 3. Provider / config.yaml / .env 首次注入
 # ══════════════════════════════════════════════════════════════════
 # 设计:
-#   - 首次启动: 依据 HERMES_DEFAULT_PROVIDER + 对应 API key 生成配置
+#   - 首次启动: 从 company-providers.yaml 读取多个模型渠道定义
+#   - 根据配置文件 priority + 实际传入的 API key 自动选择默认 provider/model
+#   - 写入所有非空 provider key 和 extra_env_vars 到 .env
 #   - 生成后写 sentinel, 后续用户自改 config.yaml / .env 不被覆盖
-#   - 如果检测不到 API key, 仍写占位文件, 用户可后续自己改
+#   - 运维可通过 /opt/data/company-providers.yaml 或 COMPANY_PROVIDERS_FILE 覆盖默认配置
 
 ENV_FILE="${HERMES_HOME}/.env"
 CFG_FILE="${HERMES_HOME}/config.yaml"
+PROVIDER_STATE="$(mktemp)"
 
 if [[ ! -f "${SENTINEL}" ]]; then
-    log "首次启动,注入 provider 配置 (${HERMES_DEFAULT_PROVIDER}/${HERMES_DEFAULT_MODEL})"
+    log "首次启动,从 ${COMPANY_PROVIDERS_FILE} 读取模型渠道配置"
 
-    # .env —— 仅注入存在的 key,空值跳过
-    {
-        for var in \
-            OPENROUTER_API_KEY \
-            OPENAI_API_KEY \
-            ANTHROPIC_API_KEY \
-            DEEPSEEK_API_KEY \
-            GEMINI_API_KEY \
-            BRAVE_API_KEY \
-            GOOGLE_API_KEY \
-            GITHUB_TOKEN \
-            DINGTALK_CLIENT_ID \
-            DINGTALK_CLIENT_SECRET \
-            DINGTALK_ALLOWED_USERS ; do
-            val="${!var:-}"
-            [[ -n "$val" ]] && printf '%s=%s\n' "$var" "$val"
-        done
-        # all-in-one 单容器固定 gateway/API Server 端口。
-        # hermes-agent gateway 明确支持 API_SERVER_HOST/API_SERVER_PORT 环境变量；
-        # 写入 .env 可避免当前版本在 YAML extra.port 未生效时回退到默认 8642。
-        printf 'API_SERVER_HOST=127.0.0.1\n'
-        printf 'API_SERVER_PORT=8702\n'
-    } > "${ENV_FILE}"
-    chmod 600 "${ENV_FILE}"
+    if [[ ! -f "${COMPANY_PROVIDERS_FILE}" ]]; then
+        log "WARN: 未找到模型渠道配置文件 ${COMPANY_PROVIDERS_FILE}, 使用 deepseek/deepseek-v4-pro 兜底"
+    fi
 
-    # config.yaml —— 写入默认模型 + 外部技能目录 (guide-v2 4.4)
-    cat > "${CFG_FILE}" <<YAML
-# 由 hermes-entrypoint.sh 首次生成。用户可自行编辑,容器重启不覆盖。
-provider: ${HERMES_DEFAULT_PROVIDER}
-model: ${HERMES_DEFAULT_MODEL}
+    COMPANY_PROVIDERS_FILE="${COMPANY_PROVIDERS_FILE}" \
+    ENV_FILE="${ENV_FILE}" \
+    CFG_FILE="${CFG_FILE}" \
+    EMPLOYEE_NAME="${EMPLOYEE_NAME}" \
+    EMPLOYEE_SEQ="${EMPLOYEE_SEQ}" \
+    DOMAIN="${DOMAIN}" \
+    ROLE="${ROLE}" \
+    HERMES_DEFAULT_PROVIDER="${HERMES_DEFAULT_PROVIDER}" \
+    HERMES_DEFAULT_MODEL="${HERMES_DEFAULT_MODEL}" \
+    PROVIDER_STATE="${PROVIDER_STATE}" \
+    python3 - <<'PY'
+import os
+from pathlib import Path
 
-providers:
-  deepseek:
-    base_url: https://api.deepseek.com
-  openrouter:
-    base_url: https://openrouter.ai/api/v1
-  openai:
-    base_url: https://api.openai.com/v1
-  anthropic:
-    base_url: https://api.anthropic.com
-  gemini:
-    base_url: https://generativelanguage.googleapis.com
+try:
+    import yaml
+except Exception as exc:
+    raise SystemExit(f"PyYAML unavailable: {exc}")
 
-skills:
-  external_dirs:
-    - /opt/skills/L1   # 公司层, 只读
-    - /opt/skills/L2   # 域层, 只读
-    - /opt/skills/L3   # 角色层, 只读
+providers_file = Path(os.environ.get("COMPANY_PROVIDERS_FILE") or "/opt/hermes/company-providers.yaml")
+env_file = Path(os.environ["ENV_FILE"])
+cfg_file = Path(os.environ["CFG_FILE"])
+state_file = Path(os.environ["PROVIDER_STATE"])
 
-platforms:
-  # all-in-one 单容器模式: hermes-web-ui 与 Hermes gateway/API Server 在同一容器内。
-  # 必须使用 127.0.0.1:8702；若使用 docker service name(如 hermes-agent),
-  # web-ui 会把它判断为 remote profile 并跳过自动启动 gateway,导致左下角显示“未连接”。
-  api_server:
-    enabled: true
-    key: ''
-    cors_origins: '*'
-    extra:
-      host: 127.0.0.1
-      port: 8702
-  dingtalk:
-    enabled: false
+if providers_file.exists():
+    data = yaml.safe_load(providers_file.read_text(encoding="utf-8")) or {}
+else:
+    data = {}
 
-employee:
-  name: ${EMPLOYEE_NAME}
-  seq: ${EMPLOYEE_SEQ}
-  domain: ${DOMAIN}
-  role: ${ROLE}
-YAML
+providers = data.get("providers") or {
+    "deepseek": {
+        "display_name": "DeepSeek",
+        "model": "deepseek-v4-pro",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "base_url": "https://api.deepseek.com",
+    }
+}
+priority = data.get("default_provider_priority") or list(providers.keys())
+extra_env_vars = data.get("extra_env_vars") or []
+
+forced_provider = (os.environ.get("HERMES_DEFAULT_PROVIDER") or "").strip()
+forced_model = (os.environ.get("HERMES_DEFAULT_MODEL") or "").strip()
+
+available = []
+for name in priority:
+    spec = providers.get(name) or {}
+    key_env = spec.get("api_key_env")
+    if key_env and os.environ.get(key_env):
+        available.append(name)
+
+if forced_provider:
+    selected = forced_provider
+elif available:
+    selected = available[0]
+elif priority:
+    selected = priority[0]
+else:
+    selected = "deepseek"
+
+selected_spec = providers.get(selected) or {}
+selected_model = forced_model or selected_spec.get("model") or "deepseek-v4-pro"
+
+# .env: 写入所有 provider 的非空 key + extra_env_vars + 固定 gateway 端口。
+# 这样用户可默认拥有多个模型渠道，进容器后通过 hermes model/config 切换。
+lines = []
+seen = set()
+for spec in providers.values():
+    key_env = spec.get("api_key_env")
+    if key_env and key_env not in seen and os.environ.get(key_env):
+        lines.append(f"{key_env}={os.environ[key_env]}")
+        seen.add(key_env)
+for var in extra_env_vars:
+    if var and var not in seen and os.environ.get(var):
+        lines.append(f"{var}={os.environ[var]}")
+        seen.add(var)
+for var, val in (("API_SERVER_HOST", "127.0.0.1"), ("API_SERVER_PORT", "8702")):
+    lines.append(f"{var}={val}")
+env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+env_file.chmod(0o600)
+
+cfg = {
+    "provider": selected,
+    "model": selected_model,
+    "providers": {},
+    "skills": {
+        "external_dirs": [
+            "/opt/skills/L1",
+            "/opt/skills/L2",
+            "/opt/skills/L3",
+        ]
+    },
+    "platforms": {
+        "api_server": {
+            "enabled": True,
+            "key": "",
+            "cors_origins": "*",
+            "extra": {"host": "127.0.0.1", "port": 8702},
+        },
+        "dingtalk": {"enabled": False},
+    },
+    "employee": {
+        "name": os.environ.get("EMPLOYEE_NAME", "unknown"),
+        "seq": os.environ.get("EMPLOYEE_SEQ", "0"),
+        "domain": os.environ.get("DOMAIN", "default"),
+        "role": os.environ.get("ROLE", "default"),
+    },
+}
+
+for name, spec in providers.items():
+    item = {}
+    for key in ("base_url", "context_length", "display_name"):
+        if spec.get(key) is not None:
+            item[key] = spec[key]
+    if spec.get("api_key_env"):
+        item["api_key_env"] = spec["api_key_env"]
+    if spec.get("model"):
+        item["model"] = spec["model"]
+    cfg["providers"][name] = item
+
+header = (
+    "# 由 hermes-entrypoint.sh 首次生成。用户可自行编辑,容器重启不覆盖。\n"
+    f"# 模型渠道来源: {providers_file}\n"
+)
+cfg_file.write_text(header + yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+state_file.write_text(f"{selected}\n{selected_model}\n", encoding="utf-8")
+PY
+
+    SELECTED_PROVIDER="$(sed -n '1p' "${PROVIDER_STATE}" 2>/dev/null || true)"
+    SELECTED_MODEL="$(sed -n '2p' "${PROVIDER_STATE}" 2>/dev/null || true)"
+    SELECTED_PROVIDER="${SELECTED_PROVIDER:-deepseek}"
+    SELECTED_MODEL="${SELECTED_MODEL:-deepseek-v4-pro}"
 
     chown hermes:hermes "${ENV_FILE}" "${CFG_FILE}"
     touch "${SENTINEL}"
     chown hermes:hermes "${SENTINEL}"
-    log "provider 配置已写入 ${CFG_FILE} / ${ENV_FILE}"
+    log "provider 配置已写入 ${CFG_FILE} / ${ENV_FILE} (${SELECTED_PROVIDER}/${SELECTED_MODEL})"
 else
     log "检测到 ${SENTINEL}, 跳过 provider 首次注入 (用户接管)"
+    if [[ -f "${CFG_FILE}" ]]; then
+        SELECTED_PROVIDER="$(python3 - <<PY 2>/dev/null || true
+import yaml
+try:
+    data=yaml.safe_load(open('${CFG_FILE}', encoding='utf-8')) or {}
+    print(data.get('provider',''))
+except Exception:
+    pass
+PY
+)"
+        SELECTED_MODEL="$(python3 - <<PY 2>/dev/null || true
+import yaml
+try:
+    data=yaml.safe_load(open('${CFG_FILE}', encoding='utf-8')) or {}
+    print(data.get('model',''))
+except Exception:
+    pass
+PY
+)"
+    fi
 fi
+rm -f "${PROVIDER_STATE}"
+SELECTED_PROVIDER="${SELECTED_PROVIDER:-${HERMES_DEFAULT_PROVIDER:-deepseek}}"
+SELECTED_MODEL="${SELECTED_MODEL:-${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}}"
 
 # ══════════════════════════════════════════════════════════════════
 # 4. 四层 SOUL.md 合并
@@ -231,7 +337,7 @@ cat <<BANNER
 ╠══════════════════════════════════════════════════════════════════╣
 ║  员工:     ${EMPLOYEE_NAME}  (seq=${EMPLOYEE_SEQ})
 ║  域/角色:  ${DOMAIN} / ${ROLE}
-║  Provider: ${HERMES_DEFAULT_PROVIDER}  /  ${HERMES_DEFAULT_MODEL}
+║  Provider: ${SELECTED_PROVIDER}  /  ${SELECTED_MODEL}
 ╠──────────────────────────────────────────────────────────────────╣
 ║  容器内端口:
 ║   ${SSH_PORT}       SSH

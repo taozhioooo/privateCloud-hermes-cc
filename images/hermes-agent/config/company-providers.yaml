@@ -1,0 +1,89 @@
+# GMSoft Hermes company-level model provider definitions.
+#
+# Entrypoint reads this file on FIRST BOOT to:
+#   1. discover all supported model providers and their API key env vars
+#   2. write all non-empty provider keys into /opt/data/.env
+#   3. select the first available provider by default_provider_priority
+#   4. generate /opt/data/config.yaml with provider/model/provider base_url entries
+#
+# Runtime override:
+#   - Mount another file to /opt/data/company-providers.yaml, or
+#   - Set COMPANY_PROVIDERS_FILE=/path/to/company-providers.yaml
+#
+# Compatibility override:
+#   - HERMES_DEFAULT_PROVIDER / HERMES_DEFAULT_MODEL still win if explicitly set.
+
+default_provider_priority:
+  - deepseek
+  - dashscope
+  - minimax
+  - openrouter
+  - anthropic
+  - openai
+  - gemini
+  - custom
+
+providers:
+  deepseek:
+    display_name: "DeepSeek"
+    model: "deepseek-v4-pro"
+    api_key_env: "DEEPSEEK_API_KEY"
+    base_url: "https://api.deepseek.com"
+    context_length: 65536
+
+  dashscope:
+    display_name: "阿里百炼 Qwen"
+    model: "qwen-max"
+    api_key_env: "DASHSCOPE_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    context_length: 131072
+
+  minimax:
+    display_name: "MiniMax"
+    model: "MiniMax-Text-01"
+    api_key_env: "MINIMAX_API_KEY"
+    base_url: "https://api.minimax.chat/v1"
+    context_length: 1000000
+
+  openrouter:
+    display_name: "OpenRouter"
+    model: "anthropic/claude-sonnet-4.5"
+    api_key_env: "OPENROUTER_API_KEY"
+    base_url: "https://openrouter.ai/api/v1"
+    context_length: 200000
+
+  anthropic:
+    display_name: "Anthropic Claude"
+    model: "claude-sonnet-4-5"
+    api_key_env: "ANTHROPIC_API_KEY"
+    base_url: "https://api.anthropic.com"
+    context_length: 200000
+
+  openai:
+    display_name: "OpenAI"
+    model: "gpt-4.1"
+    api_key_env: "OPENAI_API_KEY"
+    base_url: "https://api.openai.com/v1"
+    context_length: 128000
+
+  gemini:
+    display_name: "Google Gemini"
+    model: "gemini-2.5-pro"
+    api_key_env: "GEMINI_API_KEY"
+    base_url: "https://generativelanguage.googleapis.com"
+    context_length: 1000000
+
+  custom:
+    display_name: "公司自建模型"
+    model: "openai/company-model"
+    api_key_env: "CUSTOM_API_KEY"
+    base_url: "https://llm.company.com/v1"
+    context_length: 128000
+
+extra_env_vars:
+  - BRAVE_API_KEY
+  - GOOGLE_API_KEY
+  - GITHUB_TOKEN
+  - DINGTALK_CLIENT_ID
+  - DINGTALK_CLIENT_SECRET
+  - DINGTALK_ALLOWED_USERS

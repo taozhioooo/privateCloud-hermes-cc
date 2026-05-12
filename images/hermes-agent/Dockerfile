@@ -166,8 +166,9 @@ RUN ssh-keygen -A \
  && echo "Port 8700"                >> /etc/ssh/sshd_config
 
 # ╔═════════════════════════════════════════════════════════════════╗
-# ║  Entrypoint                                                     ║
+# ║  公司默认配置 + Entrypoint                                      ║
 # ╚═════════════════════════════════════════════════════════════════╝
+COPY config/company-providers.yaml /opt/hermes/company-providers.yaml
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/hermes-entrypoint.sh
 
 # ╔═════════════════════════════════════════════════════════════════╗
