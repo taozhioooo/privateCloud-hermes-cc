@@ -353,17 +353,20 @@ fi
 TEAM_SKILLS_DIR="/opt/data/team-skills"
 EMPLOYEE_ID="${EMPLOYEE_ID:-}"
 GITLAB_PRIVATE_TOKEN="${GITLAB_PRIVATE_TOKEN:-}"
-SKILLS_RAW_BASE="${SKILLS_RAW_BASE:-https://gitlab.gm/devops/gmsoft-hermes-skills/-/raw/master}"
+SKILLS_RAW_BASE="${SKILLS_RAW_BASE:-https://gitlab.gm/api/v4/projects/devops%2Fgmsoft-hermes-skills/repository/files}"
 
 export TEAM_SKILLS_DIR EMPLOYEE_ID GITLAB_PRIVATE_TOKEN SKILLS_RAW_BASE
 export HERMES_SKILLS_DIR="${HERMES_HOME}/skills"
 
-# ── run_remote: 从 GitLab 拉取脚本并执行 ──
+# ── run_remote: 从 GitLab API 拉取脚本并执行 ──
 # 用法: run_remote <script_name> [args...]
 # 成功时执行最新版本，网络失败时用本地缓存
+# URL 格式: {SKILLS_RAW_BASE}/scripts%2F{script_name}/raw?ref=master
 run_remote() {
     local script_name="$1"; shift
-    local url="${SKILLS_RAW_BASE}/scripts/${script_name}"
+    local encoded_path
+    encoded_path="scripts%2F$(printf '%s' "$script_name" | sed 's/\//%2F/g')"
+    local url="${SKILLS_RAW_BASE}/${encoded_path}/raw?ref=master"
     local cache_dir="${TEAM_SKILLS_DIR}/.cache"
     local cache_file="${cache_dir}/${script_name}"
 
