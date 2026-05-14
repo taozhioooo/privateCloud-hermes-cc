@@ -341,6 +341,86 @@ PY
 fi
 
 # ══════════════════════════════════════════════════════════════════
+# 3.5 Team Skills — 网络脚本模式（按工号权限拉取）
+# ══════════════════════════════════════════════════════════════════
+# 容器 .env 只需配置:
+#   EMPLOYEE_ID          — 员工工号（每人不同）
+#   SKILLS_RAW_BASE      — 脚本拉取入口地址（所有容器相同，可选，有默认值）
+#   GITLAB_PRIVATE_TOKEN — GitLab API Token（所有容器相同，用于拉取脚本和配置）
+#
+# 其余变量（SKILLS_DEPLOY_TOKEN, SKILLS_REPO_URL, GITLAB_API_URL 等）
+# 由远端 scripts/config.env 统一管理，无需在容器 .env 中配置。
+TEAM_SKILLS_DIR="/opt/data/team-skills"
+EMPLOYEE_ID="${EMPLOYEE_ID:-}"
+GITLAB_PRIVATE_TOKEN="${GITLAB_PRIVATE_TOKEN:-}"
+SKILLS_RAW_BASE="${SKILLS_RAW_BASE:-https://gitlab.gm/devops/gmsoft-hermes-skills/-/raw/master}"
+
+export TEAM_SKILLS_DIR EMPLOYEE_ID GITLAB_PRIVATE_TOKEN SKILLS_RAW_BASE
+export HERMES_SKILLS_DIR="${HERMES_HOME}/skills"
+
+# ── run_remote: 从 GitLab 拉取脚本并执行 ──
+# 用法: run_remote <script_name> [args...]
+# 成功时执行最新版本，网络失败时用本地缓存
+run_remote() {
+    local script_name="$1"; shift
+    local url="${SKILLS_RAW_BASE}/scripts/${script_name}"
+    local cache_dir="${TEAM_SKILLS_DIR}/.cache"
+    local cache_file="${cache_dir}/${script_name}"
+
+    mkdir -p "$cache_dir"
+
+    # 尝试从网络拉取
+    local tmp_file="/tmp/skills-${script_name}.$$"
+    if curl -sfk -H "PRIVATE-TOKEN: ${GITLAB_PRIVATE_TOKEN}" "$url" -o "$tmp_file" 2>/dev/null && [ -s "$tmp_file" ]; then
+        cp "$tmp_file" "$cache_file"
+        chmod +x "$cache_file"
+        if [[ "$script_name" == *.py ]]; then
+            python3 "$tmp_file" "$@"
+        else
+            bash "$tmp_file" "$@"
+        fi
+        local rc=$?
+        rm -f "$tmp_file"
+        return $rc
+    fi
+
+    rm -f "$tmp_file"
+
+    # 网络失败，尝试缓存
+    if [ -f "$cache_file" ]; then
+        log "WARN: 网络拉取 $script_name 失败，使用缓存版本"
+        if [[ "$script_name" == *.py ]]; then
+            python3 "$cache_file" "$@"
+        else
+            bash "$cache_file" "$@"
+        fi
+        return $?
+    fi
+
+    log "WARN: 无法获取 $script_name（网络失败且无缓存），跳过"
+    return 1
+}
+
+if [[ -n "${EMPLOYEE_ID}" && -n "${GITLAB_PRIVATE_TOKEN}" ]]; then
+    if [[ ! -d "${TEAM_SKILLS_DIR}/.git" ]]; then
+        # 首次启动：从网络拉 bootstrap.sh 执行
+        log "Team Skills 首次初始化 (工号: ${EMPLOYEE_ID})..."
+        run_remote "bootstrap.sh" "${EMPLOYEE_ID}" || log "WARN: Team Skills 初始化失败，跳过"
+    else
+        # 非首次：从网络拉 sync.sh 执行
+        run_remote "sync.sh" || true
+    fi
+    chown -R hermes:hermes "${TEAM_SKILLS_DIR}" 2>/dev/null || true
+
+    # 后台定时同步（间隔由远端 scripts/config.env 的 SYNC_INTERVAL 控制）
+    run_remote "sync-loop.sh" &
+else
+    if [[ -n "${EMPLOYEE_ID}" ]]; then
+        log "WARN: Team Skills 缺少 GITLAB_PRIVATE_TOKEN，跳过"
+    fi
+fi
+
+# ══════════════════════════════════════════════════════════════════
 # 4. 四层 SOUL.md 合并
 # ══════════════════════════════════════════════════════════════════
 SOUL_OUT="${HERMES_HOME}/SOUL.md"
