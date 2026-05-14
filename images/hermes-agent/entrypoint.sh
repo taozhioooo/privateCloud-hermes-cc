@@ -107,6 +107,34 @@ if [[ ! -f "${HERMES_HOME}/.ssh/id_ed25519" ]]; then
     su - hermes -c "ssh-keygen -t ed25519 -f ${HERMES_HOME}/.ssh/id_ed25519 -N '' -q"
 fi
 
+# 导出公钥到共享 volume（供 claude-code 容器读取，实现免密 SSH）
+SSH_PUB_DIR="/home/hermes/.ssh-pub"
+if [[ -d "$SSH_PUB_DIR" ]] && [[ -f "${HERMES_HOME}/.ssh/id_ed25519.pub" ]]; then
+    cp "${HERMES_HOME}/.ssh/id_ed25519.pub" "${SSH_PUB_DIR}/hermes.pub"
+    chmod 644 "${SSH_PUB_DIR}/hermes.pub"
+    log "SSH 公钥已导出到 ${SSH_PUB_DIR}/hermes.pub"
+fi
+
+# 配置 SSH 客户端免密连接 claude-code 容器（跳过 host key 检查）
+CLAUDE_HOST="${CLAUDE_HOST:-}"
+if [[ -n "$CLAUDE_HOST" ]]; then
+    SSH_CONFIG="${HERMES_HOME}/.ssh/config"
+    if ! grep -q "Host ${CLAUDE_HOST}" "$SSH_CONFIG" 2>/dev/null; then
+        cat >> "$SSH_CONFIG" << EOF
+
+Host ${CLAUDE_HOST}
+    User claude
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    IdentityFile ${HERMES_HOME}/.ssh/id_ed25519
+    LogLevel ERROR
+EOF
+        chown hermes:hermes "$SSH_CONFIG"
+        chmod 600 "$SSH_CONFIG"
+        log "SSH config: 已添加 ${CLAUDE_HOST} 免密配置"
+    fi
+fi
+
 # ══════════════════════════════════════════════════════════════════
 # 3. Provider / config.yaml / .env 首次注入
 # ══════════════════════════════════════════════════════════════════
