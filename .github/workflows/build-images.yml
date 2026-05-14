@@ -54,14 +54,13 @@ jobs:
           # 自动生成: YYYYMMDD-NN
           TODAY=$(date -u +%Y%m%d)
 
-          # 查询今天本 workflow 的已完成+进行中 runs 数量
+          # 查询今天本 workflow 已有的 runs 数量（不含当前）
           COUNT=$(gh api \
             "repos/${{ github.repository }}/actions/workflows/build-images.yml/runs?created=>=${TODAY}T00:00:00Z&per_page=100" \
             --jq '.total_count' 2>/dev/null || echo "0")
 
-          # 当前这次 run 也算在内，序号 = COUNT (已包含本次)
-          # 如果查询失败默认为 01
-          SEQ=$(printf "%02d" "${COUNT:-1}")
+          # 序号 = 已有次数 + 1（当前这次），最小为 01
+          SEQ=$(printf "%02d" "$(( ${COUNT:-0} + 1 ))")
 
           TAG="${TODAY}-${SEQ}"
           echo "IMAGE_TAG=${TAG}" >> "$GITHUB_ENV"
