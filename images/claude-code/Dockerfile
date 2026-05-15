@@ -7,7 +7,7 @@
 #       确保共享 workspace 卷时文件权限兼容
 # =============================================================================
 
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:22-bookworm-slim
+FROM node:22-bookworm-slim
 
 LABEL maintainer="Hermes Enterprise Platform"
 LABEL description="Claude Code CLI — SSH Accessible Coding Agent"
