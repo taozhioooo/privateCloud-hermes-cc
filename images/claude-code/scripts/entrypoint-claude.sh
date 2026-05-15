@@ -95,7 +95,9 @@ EOF
     echo "[model] settings.json created: model=${CLAUDE_MODEL}"
 fi
 
+# workspace 目录权限修正（共享卷首次挂载可能是 root 所有）
 mkdir -p "${CLAUDE_HOME}/workspace"
+chown claude:claude "${CLAUDE_HOME}/workspace"
 
 # ══════════════════════════════════════════════════════════════════
 # 4. 打印启动信息
