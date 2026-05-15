@@ -84,7 +84,14 @@ RUN ARCH=$(dpkg --print-architecture) \
 RUN groupadd -g 999 hermes \
  && useradd  -u 999 -g hermes -m -s /bin/bash -d /home/hermes -G sudo hermes \
  && echo "hermes ALL=(ALL) NOPASSWD: /usr/sbin/sshd" > /etc/sudoers.d/hermes-sshd \
- && chmod 0440 /etc/sudoers.d/hermes-sshd
+ && chmod 0440 /etc/sudoers.d/hermes-sshd \
+ && { echo ''; \
+      echo '# Hermes Agent environment'; \
+      echo 'export PATH=/opt/hermes/.venv/bin:/opt/data/.local/bin:$PATH'; \
+      echo 'export HERMES_HOME=/opt/data'; \
+      echo 'export HERMES_BIN=/opt/hermes/.venv/bin/hermes'; \
+      echo 'export HERMES_WEB_DIST=/opt/hermes/hermes_cli/web_dist'; \
+    } >> /home/hermes/.profile
 
 # ╔═════════════════════════════════════════════════════════════════╗
 # ║  hermes-agent  — uv 官方路线                                    ║
