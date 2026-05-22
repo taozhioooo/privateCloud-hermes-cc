@@ -39,3 +39,7 @@ images/hermes-agent.bak/
 
 # Local demo runtime data (contains keys/secrets)
 demo/
+
+# Local Team Skills GitLab working copies; not part of GitHub build repo
+gmsoft-hermes-skills/
+images/hermes-agent/gmsoft-hermes-skills/
