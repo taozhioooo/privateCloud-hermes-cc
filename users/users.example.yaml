@@ -55,6 +55,7 @@ ports:
 users:
   # 最小字段示例
   - name: zhangsan
+    employee_id: GM200801  # Team Skills 工号；未设置时默认等于 name
     seq: 1
     domain: engineering
     role: senior-engineer

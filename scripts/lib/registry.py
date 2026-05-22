@@ -62,6 +62,7 @@ def load_registry(path: str | Path) -> dict[str, Any]:
         u.setdefault("ssh_public_keys", [])
         u.setdefault("domain", "engineering")
         u.setdefault("role", "engineer")
+        u.setdefault("employee_id", u.get("name"))
     return base
 
 
@@ -145,6 +146,7 @@ def add_user(
     seq: int | None = None,
     domain: str = "engineering",
     role: str = "engineer",
+    employee_id: str | None = None,
     ssh_public_keys: list[str] | None = None,
     resources_override: dict | None = None,
     enabled: bool = True,
@@ -159,6 +161,7 @@ def add_user(
     user = {
         "name": name,
         "seq": seq_num,
+        "employee_id": employee_id or name,
         "domain": domain,
         "role": role,
         "ssh_public_keys": keys,
@@ -184,6 +187,7 @@ def update_user(
     *,
     domain: str | None = None,
     role: str | None = None,
+    employee_id: str | None = None,
     add_pubkey: str | None = None,
     enabled: bool | None = None,
     resources_override: dict | None = None,
@@ -195,6 +199,8 @@ def update_user(
         user["domain"] = domain
     if role is not None:
         user["role"] = role
+    if employee_id is not None:
+        user["employee_id"] = employee_id
     if add_pubkey is not None:
         validate_ssh_key(add_pubkey)
         keys = user.setdefault("ssh_public_keys", [])
@@ -217,10 +223,10 @@ def get_ports(seq: int, ports_config: dict[str, Any]) -> dict[str, int]:
     return {
         "h_ssh": h_ssh,
         "h_web_start": h_ssh + 1,
-        "h_web_end": h_ssh + range_size - 2,
+        "h_web_end": h_ssh + range_size - 1,
         "c_ssh": c_ssh,
         "c_web_start": c_ssh + 1,
-        "c_web_end": c_ssh + range_size - 2,
+        "c_web_end": c_ssh + range_size - 1,
     }
 
 

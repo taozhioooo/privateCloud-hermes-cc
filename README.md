@@ -1,287 +1,96 @@
-# =============================================================================
-# Hermes Enterprise Platform — Docker 部署指南
-# 双镜像架构: Hermes Agent + Claude Code（独立构建，SSH 协同）
-# =============================================================================
+# Hermes Docker Enterprise Deploy
 
-## 架构概览
+当前目录是新版 Hermes 企业 Docker 部署项目，只保留：
+- 新版 Dockerfile 镜像构建文件
+- 新版 compose 模板/渲染流程
+- users/users.yaml 用户注册表
+- scripts/cluster 集群管理命令
+- Team Skills 技能库
 
-    ┌─────────────────────────────────────────────────────────────────┐
-    │                      Docker Network: hermes-net                 │
-    │                                                                  │
-    │  ┌──────────────────┐    SSH     ┌──────────────────┐          │
-    │  │  hermes-zhangsan  │ ────────→ │  claude-zhangsan  │          │
-    │  │                   │           │                   │          │
-    │  │  Hermes Agent     │           │  Claude Code CLI  │          │
-    │  │  + 钉钉 SDK       │           │  + Node.js 22     │          │
-    │  │  + 网络搜索       │           │  + tmux           │          │
-    │  │  + SSH Server     │           │  + SSH Server     │          │
-    │  │                   │           │                   │          │
-    │  │  :8701 Gateway    │           │  :22 SSH          │          │
-    │  │  :22  SSH         │           │                   │          │
-    │  └──────┬───────────┘           └───────┬───────────┘          │
-    │         │     共享 workspace 卷           │                      │
-    │         └───────────────────────────────┘                      │
-    │                                                                  │
-    │  SSH 公钥共享卷 (ssh_pub):                                        │
-    │    Hermes 启动时生成 ed25519 密钥对 → 公钥写入共享卷              │
-    │    Claude Code 启动时读取公钥 → 写入 authorized_keys              │
-    │    结果: Hermes → Claude Code 自动免密 SSH                       │
-    │                                                                  │
-    │  ┌──────────┐                                                   │
-    │  │  Redis   │                                                   │
-    │  │  :6379   │                                                   │
-    │  └──────────┘                                                   │
-    └─────────────────────────────────────────────────────────────────┘
+旧版根目录 docker-compose.yml、setup.sh、provision_employee.sh 以及旧员工开通文档已移除。
 
+## 核心架构
 
-## SSH 接入矩阵
+每个用户一组双容器：
+- hermes-<name>：Hermes Agent + Web UI + Gateway + SSH
+- claude-<name>：Claude Code CLI + SSH
 
-    ┌─────────────────┬──────────────┬──────────────┬─────────────────┐
-    │                  │ 用户 → Hermes │ 用户 → Claude │ Hermes → Claude │
-    ├─────────────────┼──────────────┼──────────────┼─────────────────┤
-    │ 协议             │ SSH          │ SSH          │ SSH             │
-    │ 认证方式         │ 密码/公钥    │ 密码/公钥    │ 公钥(自动)      │
-    │ 默认密码         │ hermes       │ claude       │ —               │
-    │ 端口示例(seq 01) │ 10001        │ 11001        │ 内部网络        │
-    │ 用途             │ 管理Hermes   │ 管理Claude   │ 任务调度        │
-    └─────────────────┴──────────────┴──────────────┴─────────────────┘
+Hermes 容器通过共享 ssh-pub 卷把自己的公钥交给 Claude 容器，从而实现 Hermes -> Claude 免密 SSH。
 
+当前不再使用 Redis。
 
-## 快速部署（3 步）
+## 目录
 
-### 第 1 步: 配置 API 密钥
+- images/hermes-agent/：Hermes all-in-one 镜像 Dockerfile、entrypoint 和 provider 配置
+- images/claude-code/：Claude Code 镜像 Dockerfile 和 entrypoint
+- users/users.yaml：用户注册表，定义用户、seq、角色、公钥、镜像和端口规则
+- compose/base.yml：只声明 hermes-net 网络，不包含 Redis
+- compose/templates/user.yml.j2：用户双容器 compose 模板
+- compose/rendered/：由 cluster 渲染生成的用户 compose 片段
+- scripts/cluster：新版集群管理 CLI
+- scripts/lib/：cluster 的 Python 实现
+- skills/L1,L2,L3：静态技能挂载目录
+- gmsoft-hermes-skills/：Team Skills 技能库及同步脚本
+- deploy/：针对具体服务器/测试环境的独立部署包
+- demo/：本地测试运行数据，非生产入口
 
-    cd /opt/workspace/hermes-docker-deploy
+## 常用命令
+
+先配置环境变量：
+
     cp .env.example .env
-    nano .env
+    # 编辑 .env，填入 DEEPSEEK_API_KEY / SSH_PUBLIC_KEY 等
 
-    必填:
-      ANTHROPIC_API_KEY=sk-ant-xxx
+渲染 compose：
 
-    推荐:
-      BRAVE_API_KEY=xxx       网络搜索
-      GITHUB_TOKEN=ghp_xxx    GitHub 搜索
+    ./scripts/cluster render
 
-    可选 SSH 配置:
-      HERMES_SSH_PASS=hermes       Hermes SSH 密码
-      CLAUDE_SSH_PASS=claude       Claude SSH 密码
-      SSH_PUBLIC_KEY=ssh-ed25519...  免密登录公钥
+查看用户：
 
-### 第 2 步: 部署
+    ./scripts/cluster list
 
-    chmod +x setup.sh
-    ./setup.sh
+添加用户：
 
-### 第 3 步: 验证 SSH
+    ./scripts/cluster add zhaoliu --seq 4 --domain engineering --role senior-engineer --pubkey ~/.ssh/id_ed25519.pub
 
-    # 从外部 SSH 进入 Hermes 容器
-    ssh hermes@服务器IP -p 10001
-    # 输入密码: hermes
+启动单个用户：
 
-    # 从外部 SSH 进入 Claude Code 容器
-    ssh claude@服务器IP -p 11001
-    # 输入密码: claude
+    ./scripts/cluster start zhaoliu
 
-    # 如果已注入公钥，可直接免密登录
-    ssh -i ~/.ssh/id_ed25519 hermes@服务器IP -p 10001
-    ssh -i ~/.ssh/id_ed25519 claude@服务器IP -p 11001
+启动全部用户：
 
-    # 在 Hermes 容器内测试到 Claude Code 的连接
-    docker exec hermes-zhangsan ssh claude@claude-zhangsan 'claude --version'
+    ./scripts/cluster start
 
+查看状态：
 
-## 端口分配
+    ./scripts/cluster ps
 
-    每个容器独占 100 个主机端口
-    第 1 个端口用于 SSH
-    后面 98 个端口用于 Web 服务
+查看日志：
 
-    Hermes:
-      seq 01  → 10001, 10002-10099
-      seq 04  → 10301, 10302-10399
-      seq 70  → 16901, 16902-16999
+    ./scripts/cluster logs zhaoliu --tail 100
 
-    Claude Code:
-      seq 01  → 11001, 11002-11099
-      seq 04  → 11301, 11302-11399
-      seq 70  → 17901, 17902-17999
+## 端口规则
 
-    计算公式:
-      Hermes SSH      = 10001 + (seq-1) × 100
-      Hermes Web      = SSH+1  到 SSH+98
-      Claude SSH      = 11001 + (seq-1) × 100
-      Claude Web      = SSH+1  到 SSH+98
+users/users.yaml 中默认：
+- Hermes base: 10001
+- Claude base: 11001
+- step: 100
+- range_size: 100
 
+例如 seq=1：
+- Hermes SSH: 10001 -> 容器 8700
+- Hermes Web UI: 10002 -> 容器 8701
+- Hermes Gateway/API: 10003 -> 容器 8642
+- Hermes 临时服务: 10011-10100 -> 容器 8710-8799
+- Claude SSH: 11001 -> 容器 22
+- Claude 端口范围: 11002-11100
 
-## SSH 使用场景
+## 镜像构建
 
-### 场景 1: 用户 SSH 进入 Hermes 容器
+GitHub Actions 文件：
 
-    # 直接 SSH
-    ssh hermes@192.168.1.100 -p 10001
+    .github/workflows/build-images.yml
 
-    # 进入后使用 Hermes
-    hermes                              # 交互式对话
-    hermes chat -q "你好"               # 单次查询
-    hermes gateway status               # 检查钉钉连接
-    hermes skills list                  # 查看技能
-    hermes doctor                       # 环境诊断
-
-### 场景 2: 用户 SSH 进入 Claude Code 容器
-
-    # 直接 SSH
-    ssh claude@192.168.1.100 -p 11001
-
-    # 进入后使用 Claude Code
-    claude                              # 交互式 REPL
-    claude -p "写一个 hello world"      # 单次任务
-    claude auth status                  # 检查认证
-    claude --version                    # 版本
-
-    # tmux 多会话
-    tmux new -s coding
-    claude --dangerously-skip-permissions
-
-### 场景 3: Hermes 自动调用 Claude Code（容器间 SSH）
-
-    # 在 Hermes 容器内，SSH 到 Claude Code 容器执行任务
-    ssh claude@claude-zhangsan \
-      "claude -p '修复 src/auth.py 的空指针' \
-       --allowedTools 'Read,Write,Edit,Bash' \
-       --max-turns 10"
-
-    # 在 Claude Code 容器内执行并返回结果
-    ssh claude@claude-zhangsan \
-      "cd /home/claude/workspace && claude -p '列出所有 TODO 注释'"
-
-    # tmux 交互模式（通过 SSH 远程操控）
-    ssh claude@claude-zhangsan \
-      "tmux new-session -d -s work 'claude --dangerously-skip-permissions'"
-    ssh claude@claude-zhangsan \
-      "tmux send-keys -t work '重构 src/order/ 模块' Enter"
-    ssh claude@claude-zhangsan \
-      "tmux capture-pane -t work -p"
-
-
-## SSH 免密配置
-
-### 方式 1: 员工开通时注入公钥
-
-    # 传公钥文件路径
-    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 04 ~/.ssh/id_ed25519.pub
-
-    # 也可以直接传公钥内容
-    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 04 \
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host"
-
-    效果:
-      - 公钥会同时注入 Hermes 和 Claude Code
-      - 员工可用私钥直接免密 SSH 到两个容器
-
-### 方式 2: 全局公钥
-
-    # 在 .env 中设置
-    SSH_PUBLIC_KEY=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host
-
-    适合所有员工共用同一把公钥的场景
-
-### 方式 3: 逐个复制
-
-    # 生成密钥
-    ssh-keygen -t ed25519
-
-    # 手动分发到两个容器
-    ssh-copy-id -p 10001 hermes@服务器IP
-    ssh-copy-id -p 11001 claude@服务器IP
-
-### 方式 4: Hermes → Claude Code 自动免密
-
-    已自动配置，无需手动操作:
-    1. Hermes 容器启动时自动生成 ed25519 密钥对
-    2. 公钥写入共享卷 ssh_pub
-    3. Claude Code 容器启动时读取公钥到 authorized_keys
-    4. Hermes 可直接 ssh claude@claude-xxx 免密连接
-
-
-## 镜像构建与更新
-
-    日常使用 GitHub Actions 自动构建并推送镜像
-
-    镜像地址:
-      registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:latest
-      registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:latest
-
-    本地更新容器:
-      docker compose pull
-      docker compose up -d
-
-
-## 添加新员工
-
-    用法:
-    ./scripts/provision_employee.sh <用户名> <域> <角色> <序号(01-70)> [SSH公钥或公钥文件路径]
-
-    示例:
-    ./scripts/provision_employee.sh zhaoliu engineering senior-engineer 04 ~/.ssh/id_ed25519.pub
-    ./scripts/provision_employee.sh sunqi marketing product-manager 05
-
-    启动新增员工容器:
-    docker compose pull hermes-zhaoliu claude-zhaoliu
-    docker compose up -d hermes-zhaoliu claude-zhaoliu
-
-    生成结果:
-      seq 04 → Hermes 10301 / Claude 11301
-      如传入 SSH 公钥，两个容器都会自动支持免密登录
-
-    详细说明见:
-      /opt/workspace/hermes-docker-deploy/docs/employee-provisioning.md
-
-
-## 资源配置
-
-    镜像             CPU    内存    说明
-    ────────────────────────────────────────────
-    hermes-agent     2核    2GB     路由/对话/记忆
-    claude-code      4核    4GB     编码/执行任务
-
-
-## 网络搜索
-
-    Hermes 端:
-      hermes tools enable web          # 启用 web 搜索工具
-      hermes chat -q "搜索新闻"        # 自动调用搜索引擎
-
-    Claude Code 端（内置，无需配置）:
-      claude -p "搜索 React 19" --allowedTools WebSearch
-
-
-## 运维命令
-
-    # 容器管理
-    docker compose ps
-    docker compose restart hermes-zhangsan
-    docker compose logs -f hermes-zhangsan
-
-    # SSH 连接测试
-    docker exec hermes-zhangsan ssh -o StrictHostKeyChecking=no \
-      claude@claude-zhangsan 'claude --version'
-
-    # Hermes 操作
-    docker exec hermes-zhangsan hermes doctor
-    docker exec hermes-zhangsan hermes status
-
-    # Claude Code 操作
-    docker exec claude-zhangsan claude --version
-    docker exec claude-zhangsan claude auth status
-
-    # 批量更新
-    docker compose pull
-    docker compose up -d
-
-
-## 参考资源
-
-    - Hermes Agent:  https://hermes-agent.nousresearch.com/docs
-    - Claude Code:   https://docs.anthropic.com/en/docs/claude-code
-    - 钉钉开放平台:  https://open.dingtalk.com/
-    - Brave Search:  https://brave.com/search/api/
+会构建并推送：
+- registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent
+- registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code

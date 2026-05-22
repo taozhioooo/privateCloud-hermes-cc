@@ -1,37 +1,12 @@
 # =============================================================================
-# Hermes 集群基础层
+# Hermes 集群基础层（新版，无 Redis）
 # =============================================================================
-# 只包含 redis 和共享网络。所有用户相关的 service 由 compose/rendered/*.yml
-# 动态生成，通过 scripts/cluster 命令管理。
-#
-# 启动基础层:
-#   docker compose -f compose/base.yml up -d redis
-#
-# 启动全部:
-#   ./scripts/cluster start
+# 只声明共享 Docker 网络。所有用户相关 service 由 users/users.yaml +
+# compose/templates/user.yml.j2 动态生成到 compose/rendered/*.yml，
+# 并通过 scripts/cluster 管理。
 # =============================================================================
-
-services:
-  redis:
-    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/redis:7-alpine
-    container_name: hermes-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    networks:
-      - hermes-net
 
 networks:
   hermes-net:
     driver: bridge
     name: hermes-net
-
-volumes:
-  redis_data:

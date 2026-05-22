@@ -34,6 +34,15 @@ services:
       DOMAIN:        ${DOMAIN:-default}
       ROLE:          ${ROLE:-default}
 
+      # Team Skills 自动同步
+      # 入口只从 GitLab 远程拉脚本执行；同步频率、仓库地址等由远程 scripts/config.env 控制。
+      # 访问远程仓库/API 的 token 仅通过运行时环境变量注入，不能写入镜像。
+      EMPLOYEE_ID: ${EMPLOYEE_ID:-}
+      GITLAB_PRIVATE_TOKEN: ${GITLAB_PRIVATE_TOKEN:-}
+      SKILLS_RAW_BASE: ${SKILLS_RAW_BASE:-}
+      SKILLS_REF: ${SKILLS_REF:-master}
+      SKILLS_SYNC_INTERVAL: ${SKILLS_SYNC_INTERVAL:-300}
+
       # SSH 公钥 (多把用 \n 分隔)
       SSH_PUBLIC_KEY: ${SSH_PUBLIC_KEY}
 

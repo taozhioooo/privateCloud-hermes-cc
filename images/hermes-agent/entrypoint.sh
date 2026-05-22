@@ -279,6 +279,7 @@ cfg = {
     },
     "employee": {
         "name": os.environ.get("EMPLOYEE_NAME", "unknown"),
+        "id": os.environ.get("EMPLOYEE_ID") or os.environ.get("EMPLOYEE_NAME", "unknown"),
         "seq": os.environ.get("EMPLOYEE_SEQ", "0"),
         "domain": os.environ.get("DOMAIN", "default"),
         "role": os.environ.get("ROLE", "default"),
@@ -382,19 +383,20 @@ TEAM_SKILLS_DIR="/opt/data/team-skills"
 EMPLOYEE_ID="${EMPLOYEE_ID:-}"
 GITLAB_PRIVATE_TOKEN="${GITLAB_PRIVATE_TOKEN:-}"
 SKILLS_RAW_BASE="${SKILLS_RAW_BASE:-https://gitlab.gm/api/v4/projects/devops%2Fgmsoft-hermes-skills/repository/files}"
+SKILLS_REF="${SKILLS_REF:-master}"
 
-export TEAM_SKILLS_DIR EMPLOYEE_ID GITLAB_PRIVATE_TOKEN SKILLS_RAW_BASE
+export TEAM_SKILLS_DIR EMPLOYEE_ID GITLAB_PRIVATE_TOKEN SKILLS_RAW_BASE SKILLS_REF
 export HERMES_SKILLS_DIR="${HERMES_HOME}/skills"
 
 # ── run_remote: 从 GitLab API 拉取脚本并执行 ──
 # 用法: run_remote <script_name> [args...]
 # 成功时执行最新版本，网络失败时用本地缓存
-# URL 格式: {SKILLS_RAW_BASE}/scripts%2F{script_name}/raw?ref=master
+# URL 格式: {SKILLS_RAW_BASE}/scripts%2F{script_name}/raw?ref=${SKILLS_REF}
 run_remote() {
     local script_name="$1"; shift
     local encoded_path
     encoded_path="scripts%2F$(printf '%s' "$script_name" | sed 's/\//%2F/g')"
-    local url="${SKILLS_RAW_BASE}/${encoded_path}/raw?ref=master"
+    local url="${SKILLS_RAW_BASE}/${encoded_path}/raw?ref=${SKILLS_REF}"
     local cache_dir="${TEAM_SKILLS_DIR}/.cache"
     local cache_file="${cache_dir}/${script_name}"
 

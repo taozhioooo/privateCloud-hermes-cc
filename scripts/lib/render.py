@@ -41,6 +41,7 @@ def render_user(
     resources = reg.get_effective_resources(user, defaults)
     ctx = {
         "name": user["name"],
+        "employee_id": user.get("employee_id") or user["name"],
         "seq": user["seq"],
         "domain": user.get("domain", "engineering"),
         "role": user.get("role", "engineer"),

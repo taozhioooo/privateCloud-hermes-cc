@@ -92,6 +92,7 @@ def cmd_add(args: argparse.Namespace) -> int:
             seq=args.seq,
             domain=args.domain,
             role=args.role,
+            employee_id=args.employee_id,
             ssh_public_keys=keys,
             enabled=True,
         )
@@ -149,6 +150,7 @@ def cmd_add_bulk(args: argparse.Namespace) -> int:
                 seq=seq_val,
                 domain=row.get("domain") or "engineering",
                 role=row.get("role") or "engineer",
+                employee_id=row.get("employee_id") or None,
                 ssh_public_keys=[pubkey] if pubkey else [],
                 enabled=True,
             )
@@ -235,6 +237,7 @@ def cmd_update(args: argparse.Namespace) -> int:
             args.name,
             domain=args.domain,
             role=args.role,
+            employee_id=args.employee_id,
             add_pubkey=pubkey,
             enabled=enabled_flag,
         )
@@ -257,6 +260,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         p = reg.get_ports(u["seq"], ports_cfg)
         row: dict[str, Any] = {
             "name": u["name"],
+            "employee_id": u.get("employee_id") or u["name"],
             "seq": u["seq"],
             "domain": u.get("domain", ""),
             "role": u.get("role", ""),
@@ -280,7 +284,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         info("no users registered")
         return 0
 
-    headers = ["NAME", "SEQ", "DOMAIN", "ROLE", "ENABLED"]
+    headers = ["NAME", "EMPLOYEE_ID", "SEQ", "DOMAIN", "ROLE", "ENABLED"]
     if args.ports:
         headers += ["HERMES-SSH", "HERMES-WEB", "CLAUDE-SSH", "CLAUDE-WEB"]
     if args.status:
@@ -289,7 +293,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     lines = []
     for r in rows:
         enabled_str = green("yes") if r["enabled"] else dim("no")
-        line = [r["name"], str(r["seq"]), r["domain"], r["role"], enabled_str]
+        line = [r["name"], r["employee_id"], str(r["seq"]), r["domain"], r["role"], enabled_str]
         if args.ports:
             line += [
                 str(r["hermes_ssh"]), r["hermes_web"],
@@ -341,6 +345,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     ports = reg.get_ports(user["seq"], registry["ports"])
     resources = reg.get_effective_resources(user, registry["defaults"])
     print(bold(f"User: {user['name']}"))
+    print(f"  employee_id: {user.get('employee_id') or user['name']}")
     print(f"  seq        : {user['seq']}")
     print(f"  domain     : {user.get('domain', '')}")
     print(f"  role       : {user.get('role', '')}")
@@ -486,6 +491,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ap = sub.add_parser("add", help="add a new user")
     ap.add_argument("name")
+    ap.add_argument("--employee-id", help="工号/员工 ID，用于 Team Skills 权限解析；默认等于 name")
     ap.add_argument("--seq", type=int, default=None)
     ap.add_argument("--domain", default="engineering")
     ap.add_argument("--role", default="engineer")
@@ -493,7 +499,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-start", action="store_true")
     ap.set_defaults(func=cmd_add)
 
-    ab = sub.add_parser("add-bulk", help="add users from CSV (columns: name,seq,domain,role,pubkey)")
+    ab = sub.add_parser("add-bulk", help="add users from CSV (columns: name,employee_id,seq,domain,role,pubkey)")
     ab.add_argument("csv_file")
     ab.add_argument("--parallel", type=int, default=4)
     ab.add_argument("--no-start", action="store_true")
@@ -506,6 +512,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     up = sub.add_parser("update", help="update user fields")
     up.add_argument("name")
+    up.add_argument("--employee-id", help="工号/员工 ID，用于 Team Skills 权限解析")
     up.add_argument("--domain")
     up.add_argument("--role")
     up.add_argument("--pubkey", help="append SSH public key")

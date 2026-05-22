@@ -31,6 +31,12 @@ services:
       - EMPLOYEE_SEQ={{ '%02d' | format(seq) }}
       - DOMAIN={{ domain }}
       - ROLE={{ role }}
+      # Team Skills 自动同步：入口只远程执行脚本；频率/仓库地址等由远程 scripts/config.env 控制
+      - EMPLOYEE_ID={{ employee_id }}
+      - GITLAB_PRIVATE_TOKEN=${GITLAB_PRIVATE_TOKEN:-}
+      - SKILLS_RAW_BASE=${SKILLS_RAW_BASE:-}
+      - SKILLS_REF=${SKILLS_REF:-master}
+      - SKILLS_SYNC_INTERVAL=${SKILLS_SYNC_INTERVAL:-300}
       # 端口信息
       - SSH_PORT={{ h_ssh_port }}
       - WEB_PORT_START={{ h_web_start }}
@@ -44,20 +50,21 @@ services:
       - SSH_PUBLIC_KEY={{ ssh_public_keys | join('\n') }}
 {%- endif %}
     ports:
-      - "{{ h_ssh_port }}:22"
-      - "{{ h_web_start }}-{{ h_web_end }}:{{ h_web_start }}-{{ h_web_end }}"
+      # 当前 hermes-agent all-in-one 镜像内部固定端口：8700 SSH, 8701 WebUI,
+      # 8642 Gateway/API, 8710-8799 临时服务。宿主机按员工 seq 映射。
+      - "{{ h_ssh_port }}:8700"
+      - "{{ h_web_start }}:8701"
+      - "{{ h_web_start + 1 }}:8642"
+      - "{{ h_web_start + 9 }}-{{ h_web_end }}:8710-{{ 8710 + (h_web_end - (h_web_start + 9)) }}"
     volumes:
-      - {{ name }}_hermes:/home/hermes/.hermes
-      - {{ name }}_workspace:/home/hermes/workspace
+      - {{ name }}_hermes:/opt/data
+      - {{ name }}_workspace:/workspace
       - {{ name }}_ssh_pub:/home/hermes/.ssh-pub
       - ../../skills/L1:/opt/skills/L1:ro
       - ../../skills/L2:/opt/skills/L2:ro
       - ../../skills/L3:/opt/skills/L3:ro
     networks:
       - hermes-net
-    depends_on:
-      redis:
-        condition: service_healthy
     deploy:
       resources:
         limits:
