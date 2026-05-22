@@ -31,6 +31,9 @@ compose/rendered/*.yaml
 # Per-user env overrides
 users/*/.env
 
+# Local Claude Code default settings may contain provider secrets; keep the example tracked instead.
+config/claude-settings.json
+
 # Upstream clones pulled on demand by CI (hermes-agent + hermes-web-ui)
 images/hermes-agent/hermes-agent/
 images/hermes-agent/hermes-web-ui/

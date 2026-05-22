@@ -99,6 +99,7 @@ services:
       - ../../data/{{ user_data_dir }}/workspace:/home/claude/workspace
       - ../../data/{{ user_data_dir }}/ssh-pub:/hermes-ssh-pub:ro
       - ../../data/{{ user_data_dir }}/claude-home:/home/claude/.claude
+      - ../../config/claude-settings.json:/etc/claude/settings.json:ro
     networks:
       - hermes-net
     deploy:

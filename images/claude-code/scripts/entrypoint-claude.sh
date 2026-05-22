@@ -72,21 +72,17 @@ fi
 # ══════════════════════════════════════════════════════════════════
 
 mkdir -p "${CLAUDE_HOME}/.claude"
+CLAUDE_SETTINGS_SRC="/etc/claude/settings.json"
+CLAUDE_SETTINGS_DST="${CLAUDE_HOME}/.claude/settings.json"
 
-# 每次启动都更新 model 字段，确保与环境变量一致
-# 如果 settings.json 已存在，用 node 合并（保留 permissions 等其他字段）
-if [ -f "${CLAUDE_HOME}/.claude/settings.json" ]; then
-    node -e "
-const fs = require('fs');
-const path = '${CLAUDE_HOME}/.claude/settings.json';
-let s = {};
-try { s = JSON.parse(fs.readFileSync(path, 'utf8')); } catch(e) {}
-s.model = '${CLAUDE_MODEL}';
-fs.writeFileSync(path, JSON.stringify(s, null, 2) + '\n');
-console.log('[model] settings.json updated: model=' + s.model);
-"
+# 首次启动才初始化 settings.json；后续保留用户自定义，不再覆盖 model/permissions/env 等字段。
+if [ -f "${CLAUDE_SETTINGS_DST}" ]; then
+    echo "[settings] using existing user-customized settings.json"
+elif [ -f "${CLAUDE_SETTINGS_SRC}" ]; then
+    cp "${CLAUDE_SETTINGS_SRC}" "${CLAUDE_SETTINGS_DST}"
+    echo "[settings] initialized from ${CLAUDE_SETTINGS_SRC}"
 else
-    cat > "${CLAUDE_HOME}/.claude/settings.json" << EOF
+    cat > "${CLAUDE_SETTINGS_DST}" << EOF
 {
   "model": "${CLAUDE_MODEL}",
   "permissions": {
@@ -95,8 +91,10 @@ else
   }
 }
 EOF
-    echo "[model] settings.json created: model=${CLAUDE_MODEL}"
+    echo "[settings] created fallback settings.json: model=${CLAUDE_MODEL}"
 fi
+
+chown -R claude:claude "${CLAUDE_HOME}/.claude"
 
 # workspace 目录权限修正（共享卷首次挂载可能是 root 所有）
 mkdir -p "${CLAUDE_HOME}/workspace"
