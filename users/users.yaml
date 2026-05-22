@@ -1,7 +1,7 @@
 version: 1
 defaults:
   image_hermes: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:2026052201
-  image_claude: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052203
+  image_claude: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052204
   resources:
     hermes:
       cpus: '2.0'
