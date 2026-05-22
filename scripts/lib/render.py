@@ -42,10 +42,11 @@ def render_user(
     ctx = {
         "name": user["name"],
         "employee_id": user.get("employee_id") or user["name"],
+        "user_data_dir": f"{user['name']}-{user.get('employee_id') or user['name']}",
         "seq": user["seq"],
         "domain": user.get("domain", "engineering"),
         "role": user.get("role", "engineer"),
-        "ssh_public_keys": user.get("ssh_public_keys") or [],
+        "ssh_public_keys": reg.normalize_ssh_public_keys(user.get("ssh_public_keys")),
         "image_hermes": defaults["image_hermes"],
         "image_claude": defaults["image_claude"],
         "hermes_mode": defaults.get("hermes_mode", "gateway"),

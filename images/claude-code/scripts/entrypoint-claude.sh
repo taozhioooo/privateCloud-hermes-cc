@@ -11,7 +11,10 @@ CLAUDE_HOME="/home/claude"
 
 EMPLOYEE_NAME="${EMPLOYEE_NAME:-unknown}"
 EMPLOYEE_SEQ="${EMPLOYEE_SEQ:-??}"
+# Host-facing SSH port published by Docker Compose (for banner/docs only).
+# Inside the container sshd must listen on 22 because compose maps host {{c_ssh_port}} -> container 22.
 SSH_PORT="${SSH_PORT:-22}"
+SSHD_LISTEN_PORT="${SSHD_LISTEN_PORT:-22}"
 WEB_PORT_START="${WEB_PORT_START:-11002}"
 WEB_PORT_END="${WEB_PORT_END:-11099}"
 CLAUDE_SSH_PASS="${CLAUDE_SSH_PASS:-claude}"
@@ -152,4 +155,5 @@ BANNER
 # 5. 启动 SSH Server
 # ══════════════════════════════════════════════════════════════════
 
-exec /usr/sbin/sshd -D -o "Port ${SSH_PORT:-22}"
+# Listen on container port 22; Docker Compose publishes the per-employee host port.
+exec /usr/sbin/sshd -D -o "Port ${SSHD_LISTEN_PORT:-22}"

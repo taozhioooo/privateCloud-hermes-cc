@@ -7,6 +7,7 @@
 # Runtime data
 *.log
 *.pid
+data/
 
 # Python
 __pycache__/

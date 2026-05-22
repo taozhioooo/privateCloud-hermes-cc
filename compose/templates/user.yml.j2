@@ -42,7 +42,7 @@ services:
       - WEB_PORT_START={{ h_web_start }}
       - WEB_PORT_END={{ h_web_end }}
       - CLAUDE_HOST=claude-{{ name }}
-      - CLAUDE_SSH_PORT={{ c_ssh_port }}
+      - CLAUDE_SSH_PORT=22
       # SSH
       - HERMES_SSH_PASS=hermes
       - HERMES_MODE={{ hermes_mode }}
@@ -57,9 +57,10 @@ services:
       - "{{ h_web_start + 1 }}:8642"
       - "{{ h_web_start + 9 }}-{{ h_web_end }}:8710-{{ 8710 + (h_web_end - (h_web_start + 9)) }}"
     volumes:
-      - {{ name }}_hermes:/opt/data
-      - {{ name }}_workspace:/workspace
-      - {{ name }}_ssh_pub:/home/hermes/.ssh-pub
+      # 每个员工的全部运行时文件集中放在 data/<姓名>-<工号>/，便于作为 Windows 网络磁盘挂载。
+      - ../../data/{{ user_data_dir }}/hermes:/opt/data
+      - ../../data/{{ user_data_dir }}/workspace:/workspace
+      - ../../data/{{ user_data_dir }}/ssh-pub:/home/hermes/.ssh-pub
       - ../../skills/L1:/opt/skills/L1:ro
       - ../../skills/L2:/opt/skills/L2:ro
       - ../../skills/L3:/opt/skills/L3:ro
@@ -84,6 +85,7 @@ services:
       - EMPLOYEE_NAME={{ name }}
       - EMPLOYEE_SEQ={{ '%02d' | format(seq) }}
       - SSH_PORT={{ c_ssh_port }}
+      - SSHD_LISTEN_PORT=22
       - WEB_PORT_START={{ c_web_start }}
       - WEB_PORT_END={{ c_web_end }}
       - HERMES_HOST=hermes-{{ name }}
@@ -94,8 +96,9 @@ services:
       - "{{ c_ssh_port }}:22"
       - "{{ c_web_start }}-{{ c_web_end }}:{{ c_web_start }}-{{ c_web_end }}"
     volumes:
-      - {{ name }}_workspace:/home/claude/workspace
-      - {{ name }}_ssh_pub:/hermes-ssh-pub:ro
+      - ../../data/{{ user_data_dir }}/workspace:/home/claude/workspace
+      - ../../data/{{ user_data_dir }}/ssh-pub:/hermes-ssh-pub:ro
+      - ../../data/{{ user_data_dir }}/claude-home:/home/claude/.claude
     networks:
       - hermes-net
     deploy:
@@ -110,8 +113,3 @@ networks:
   hermes-net:
     external: true
     name: hermes-net
-
-volumes:
-  {{ name }}_hermes:
-  {{ name }}_workspace:
-  {{ name }}_ssh_pub:

@@ -1,7 +1,7 @@
 version: 1
 defaults:
-  image_hermes: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:latest
-  image_claude: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:latest
+  image_hermes: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:2026052201
+  image_claude: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052202
   resources:
     hermes:
       cpus: '2.0'
@@ -11,27 +11,15 @@ defaults:
       memory: 4G
   hermes_mode: gateway
 ports:
-  hermes_base: 10001
-  claude_base: 11001
+  hermes_base: 10000
+  claude_base: 10100
   step: 100
   range_size: 100
 users:
-- name: zhangsan
+- name: lr
   seq: 1
+  employee_id: GM20230204
   domain: engineering
-  role: senior-engineer
-  ssh_public_keys:
-  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOXQLl2/wMH5vVM9nmiZXBiqcPrpyvSP25MW2QirAknR administrator@DA
-  enabled: true
-- name: lisi
-  seq: 2
-  domain: marketing
-  role: product-manager
-  ssh_public_keys: []
-  enabled: true
-- name: wangwu
-  seq: 3
-  domain: marketing
-  role: pm
-  ssh_public_keys: []
+  role: engineer
+  ssh_public_keys: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOXQLl2/wMH5vVM9nmiZXBiqcPrpyvSP25MW2QirAknR administrator@DA
   enabled: true

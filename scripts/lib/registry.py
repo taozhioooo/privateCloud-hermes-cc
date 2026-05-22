@@ -20,6 +20,33 @@ class RegistryError(Exception):
     pass
 
 
+def normalize_ssh_public_keys(value: Any) -> list[str]:
+    """Normalize YAML ssh_public_keys to a list.
+
+    Supports both the canonical list form and a convenient single-string form:
+      ssh_public_keys:
+        - ssh-ed25519 AAAA...
+      ssh_public_keys: ssh-ed25519 AAAA...
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        return [stripped] if stripped else []
+    if isinstance(value, list):
+        keys: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if not isinstance(item, str):
+                raise RegistryError("ssh_public_keys entries must be strings")
+            stripped = item.strip()
+            if stripped:
+                keys.append(stripped)
+        return keys
+    raise RegistryError("ssh_public_keys must be a string or a list of strings")
+
+
 def _default_registry() -> dict[str, Any]:
     return {
         "version": REGISTRY_VERSION,
@@ -59,7 +86,7 @@ def load_registry(path: str | Path) -> dict[str, Any]:
     base["users"] = data.get("users") or []
     for u in base["users"]:
         u.setdefault("enabled", True)
-        u.setdefault("ssh_public_keys", [])
+        u["ssh_public_keys"] = normalize_ssh_public_keys(u.get("ssh_public_keys"))
         u.setdefault("domain", "engineering")
         u.setdefault("role", "engineer")
         u.setdefault("employee_id", u.get("name"))
