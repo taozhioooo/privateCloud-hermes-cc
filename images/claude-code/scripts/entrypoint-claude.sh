@@ -52,20 +52,45 @@ fi
 [ -f "${CLAUDE_HOME}/.ssh/authorized_keys" ] && chmod 600 "${CLAUDE_HOME}/.ssh/authorized_keys"
 
 # ══════════════════════════════════════════════════════════════════
-# 2. API Key 配置
+# 2. API Key / Claude Code environment 配置
 # ══════════════════════════════════════════════════════════════════
 
-# Anthropic key（如果有）
-if [ -n "$ANTHROPIC_API_KEY" ]; then
-    grep -q "ANTHROPIC_API_KEY" "${CLAUDE_HOME}/.bashrc" 2>/dev/null || \
-        echo "export ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" >> "${CLAUDE_HOME}/.bashrc"
-fi
+# Claude Code does not reliably export settings.json.env into every SSH/login shell.
+# Persist those env vars in a separate shell snippet so both interactive `claude`
+# and `claude -p` can use the company Anthropic-compatible endpoint without OAuth login.
+CLAUDE_ENV_FILE="${CLAUDE_HOME}/.claude/claude-code-env.sh"
+write_claude_env_file() {
+    if [ -f "${CLAUDE_SETTINGS_DST}" ]; then
+        SETTINGS_PATH="${CLAUDE_SETTINGS_DST}" ENV_OUT="${CLAUDE_ENV_FILE}" python3 - <<'PY'
+import json, os, shlex
+from pathlib import Path
+settings = Path(os.environ['SETTINGS_PATH'])
+out = Path(os.environ['ENV_OUT'])
+try:
+    env = json.loads(settings.read_text(encoding='utf-8')).get('env') or {}
+except Exception:
+    env = {}
+lines = [
+    '# Auto-generated from ~/.claude/settings.json env on container start.',
+    '# Edit ~/.claude/settings.json, then restart the container to regenerate this file.',
+]
+for key, value in env.items():
+    if not isinstance(key, str) or not key.replace('_', '').isalnum() or key[0].isdigit():
+        continue
+    if value is None:
+        continue
+    lines.append(f'export {key}={shlex.quote(str(value))}')
+out.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+PY
+        chown claude:claude "${CLAUDE_ENV_FILE}"
+        chmod 600 "${CLAUDE_ENV_FILE}"
+    fi
+}
 
-# DeepSeek key（如果有，写入 ANTHROPIC_API_KEY 供 claude 使用自定义 endpoint）
-if [ -n "$DEEPSEEK_API_KEY" ]; then
-    grep -q "DEEPSEEK_API_KEY" "${CLAUDE_HOME}/.bashrc" 2>/dev/null || \
-        echo "export DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}" >> "${CLAUDE_HOME}/.bashrc"
-fi
+ensure_bashrc_source() {
+    local line="[ -f \"${CLAUDE_ENV_FILE}\" ] && . \"${CLAUDE_ENV_FILE}\""
+    grep -qF "${CLAUDE_ENV_FILE}" "${CLAUDE_HOME}/.bashrc" 2>/dev/null || echo "${line}" >> "${CLAUDE_HOME}/.bashrc"
+}
 
 # ══════════════════════════════════════════════════════════════════
 # 3. Claude Code settings.json — 写入模型配置
@@ -74,6 +99,7 @@ fi
 mkdir -p "${CLAUDE_HOME}/.claude"
 CLAUDE_SETTINGS_SRC="/etc/claude/settings.json"
 CLAUDE_SETTINGS_DST="${CLAUDE_HOME}/.claude/settings.json"
+CLAUDE_ENV_FILE="${CLAUDE_HOME}/.claude/claude-code-env.sh"
 
 # 首次启动才初始化 settings.json；后续保留用户自定义，不再覆盖 model/permissions/env 等字段。
 if [ -f "${CLAUDE_SETTINGS_DST}" ]; then
@@ -95,6 +121,9 @@ EOF
 fi
 
 chown -R claude:claude "${CLAUDE_HOME}/.claude"
+write_claude_env_file
+ensure_bashrc_source
+chown claude:claude "${CLAUDE_HOME}/.bashrc"
 
 # workspace 目录权限修正（共享卷首次挂载可能是 root 所有）
 mkdir -p "${CLAUDE_HOME}/workspace"
