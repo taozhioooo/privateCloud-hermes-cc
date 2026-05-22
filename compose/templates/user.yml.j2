@@ -58,12 +58,12 @@ services:
       - "{{ h_web_start + 9 }}-{{ h_web_end }}:8710-{{ 8710 + (h_web_end - (h_web_start + 9)) }}"
     volumes:
       # 每个员工的全部运行时文件集中放在 data/<姓名>-<工号>/，便于作为 Windows 网络磁盘挂载。
-      - ../../data/{{ user_data_dir }}/hermes:/opt/data
-      - ../../data/{{ user_data_dir }}/workspace:/workspace
-      - ../../data/{{ user_data_dir }}/ssh-pub:/home/hermes/.ssh-pub
-      - ../../skills/L1:/opt/skills/L1:ro
-      - ../../skills/L2:/opt/skills/L2:ro
-      - ../../skills/L3:/opt/skills/L3:ro
+      - ./data/{{ user_data_dir }}/hermes:/opt/data
+      - ./data/{{ user_data_dir }}/workspace:/workspace
+      - ./data/{{ user_data_dir }}/ssh-pub:/home/hermes/.ssh-pub
+      - ./skills/L1:/opt/skills/L1:ro
+      - ./skills/L2:/opt/skills/L2:ro
+      - ./skills/L3:/opt/skills/L3:ro
     networks:
       - hermes-net
     deploy:
@@ -96,10 +96,10 @@ services:
       - "{{ c_ssh_port }}:22"
       - "{{ c_web_start }}-{{ c_web_end }}:{{ c_web_start }}-{{ c_web_end }}"
     volumes:
-      - ../../data/{{ user_data_dir }}/workspace:/home/claude/workspace
-      - ../../data/{{ user_data_dir }}/ssh-pub:/hermes-ssh-pub:ro
-      - ../../data/{{ user_data_dir }}/claude-home:/home/claude/.claude
-      - ../../config/claude-settings.json:/etc/claude/settings.json:ro
+      - ./data/{{ user_data_dir }}/workspace:/home/claude/workspace
+      - ./data/{{ user_data_dir }}/ssh-pub:/hermes-ssh-pub:ro
+      - ./data/{{ user_data_dir }}/claude-home:/home/claude/.claude
+      - ./config/claude-settings.json:/etc/claude/settings.json:ro
     networks:
       - hermes-net
     deploy:
