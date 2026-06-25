@@ -100,9 +100,9 @@ WORKDIR /opt/hermes
 
 # -------- Node 端依赖(分层缓存) --------
 # 先拷 manifest,lock 没变就复用
-COPY hermes-agent/package.json  hermes-agent/package-lock.json  ./
-COPY hermes-agent/web/package.json   hermes-agent/web/package-lock.json    web/
-COPY hermes-agent/ui-tui/package.json hermes-agent/ui-tui/package-lock.json ui-tui/
+COPY hermes-agent/package.json hermes-agent/package-lock.json ./
+COPY hermes-agent/web/package*.json    web/
+COPY hermes-agent/ui-tui/package*.json ui-tui/
 # file: workspace 依赖需要完整源码,否则 npm 解析失败
 COPY hermes-agent/ui-tui/packages/hermes-ink/ ui-tui/packages/hermes-ink/
 
