@@ -435,6 +435,8 @@ run_remote() {
 }
 
 if [[ -n "${EMPLOYEE_ID}" && -n "${GITLAB_PRIVATE_TOKEN}" ]]; then
+    # 内网 GitLab 自签证书场景，允许 git clone 通过 HTTPS
+    export GIT_SSL_NO_VERIFY=1
     if [[ ! -d "${TEAM_SKILLS_DIR}/.git" ]]; then
         # 首次启动：从网络拉 bootstrap.sh 执行
         log "Team Skills 首次初始化 (工号: ${EMPLOYEE_ID})..."
