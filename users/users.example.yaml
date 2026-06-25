@@ -26,10 +26,12 @@
 #     enabled        - 是否启用 (false 时不会被渲染)
 #
 # 端口计算公式 (seq=N 时):
-#   Hermes SSH:  hermes_base + (N-1) * step         = 10001 + (N-1)*100
-#   Hermes Web:  [hermes_ssh + 1, hermes_ssh + 98]
-#   Claude SSH:  claude_base + (N-1) * step         = 11001 + (N-1)*100
-#   Claude Web:  [claude_ssh + 1, claude_ssh + 98]
+#   Hermes SSH:      hermes_base + (N-1) * step      = 10000 + (N-1)*100
+#   Hermes Web UI:   hermes_ssh + 1                  -> container 8701
+#   Hermes Gateway:  hermes_ssh + 2                  -> container 8642
+#   Hermes Temp:     [hermes_ssh + 10, hermes_ssh + 99] -> container 8710-8799
+#   Claude SSH:      claude_base + (N-1) * step      = 10100 + (N-1)*100 -> container 22
+#   Claude Web:      [claude_ssh + 1, claude_ssh + 99]
 # =============================================================================
 
 version: 1
@@ -47,8 +49,8 @@ defaults:
   hermes_mode: gateway
 
 ports:
-  hermes_base: 10001
-  claude_base: 11001
+  hermes_base: 10000
+  claude_base: 10100
   step: 100
   range_size: 100
 

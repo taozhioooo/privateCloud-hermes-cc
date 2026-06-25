@@ -23,9 +23,10 @@ services:
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      # 钉钉
-      - DINGTALK_APP_KEY=${DINGTALK_APP_KEY:-}
-      - DINGTALK_APP_SECRET=${DINGTALK_APP_SECRET:-}
+      # 钉钉（与 images/hermes-agent/config/company-providers.yaml 保持一致）
+      - DINGTALK_CLIENT_ID=${DINGTALK_CLIENT_ID:-}
+      - DINGTALK_CLIENT_SECRET=${DINGTALK_CLIENT_SECRET:-}
+      - DINGTALK_ALLOWED_USERS=${DINGTALK_ALLOWED_USERS:-}
       # 员工身份
       - EMPLOYEE_NAME={{ name }}
       - EMPLOYEE_SEQ={{ '%02d' | format(seq) }}
@@ -98,7 +99,9 @@ services:
     volumes:
       - ./data/{{ user_data_dir }}/workspace:/home/claude/workspace
       - ./data/{{ user_data_dir }}/ssh-pub:/hermes-ssh-pub:ro
+      # Claude Code 官方默认读取 ~/.claude/settings.json；该目录持久化后用户可自行修改。
       - ./data/{{ user_data_dir }}/claude-home:/home/claude/.claude
+      # 公司默认模板：entrypoint 仅在 ~/.claude/settings.json 不存在时复制一次，后续不覆盖用户配置。
       - ./config/claude-settings.json:/etc/claude/settings.json:ro
     networks:
       - hermes-net

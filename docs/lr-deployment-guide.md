@@ -2,7 +2,7 @@
 
 本文档基于当前 `/opt/workspace/hermes-docker-deploy/users/users.yaml` 重新生成。
 
-生成时间：2026-05-22
+生成时间：2026-05-26
 
 ## 1. 当前部署对象
 
@@ -15,7 +15,7 @@
 使用镜像：
 
 - Hermes: `registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:2026052201`
-- Claude: `registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052202`
+- Claude: `registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052204`
 
 端口规划：
 
@@ -40,6 +40,34 @@
   - `workspace/`：Hermes 与 Claude 共享工作区
   - `ssh-pub/`：Hermes → Claude 免密 SSH 公钥交换
   - `claude-home/`：Claude Code 用户配置目录
+
+## 1.1 Claude Code settings.json 初始化策略
+
+当前部署保留“首次启动使用公司模板，后续允许用户自定义”的方案：
+
+| 路径 | 类型 | 说明 |
+|---|---|---|
+| `config/claude-settings.json` | 宿主机模板 | 公司默认 Claude Code settings；可能包含 provider/env/permissions；已 gitignore |
+| `/etc/claude/settings.json` | 容器只读模板 | 由 `config/claude-settings.json` 只读挂载得到 |
+| `data/lr-GM20230204/claude-home/` | 宿主持久化目录 | 当前 LR 用户的 Claude home |
+| `/home/claude/.claude/settings.json` | 容器用户配置 | Claude Code 官方默认读取的实际配置文件 |
+
+启动行为：
+
+1. 如果 `/home/claude/.claude/settings.json` 不存在，Claude entrypoint 从 `/etc/claude/settings.json` 复制一份。
+2. 如果 `/home/claude/.claude/settings.json` 已存在，entrypoint 认为用户已经自定义，后续重启不会覆盖。
+3. `settings.json` 中的 `env` 会被 entrypoint 生成到 `/home/claude/.claude/claude-code-env.sh`，并在 `.bashrc` 中 source，确保 SSH 登录和 `claude -p` 都能拿到 Anthropic-compatible endpoint 环境变量。
+
+如需让新的公司模板重新作用于已有 LR 用户：
+
+```bash
+cd /opt/workspace/hermes-docker-deploy
+cp data/lr-GM20230204/claude-home/settings.json    data/lr-GM20230204/claude-home/settings.json.bak.$(date +%Y%m%d-%H%M%S)
+rm data/lr-GM20230204/claude-home/settings.json
+./scripts/cluster restart lr
+```
+
+注意：不要直接把 `/etc/claude/settings.json` 当作 Claude Code 默认配置路径；Claude Code 默认读取的是 `~/.claude/settings.json`。
 
 ## 2. 首次部署准备
 
@@ -132,7 +160,7 @@ compose/rendered/user.lr.yml
 
 ```bash
 docker pull registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:2026052201
-docker pull registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052202
+docker pull registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052204
 ```
 
 ## 6. 启动 LR 员工环境
@@ -160,7 +188,9 @@ docker compose \
 查看容器：
 
 ```bash
-./scripts/cluster ps lr
+./scripts/cluster list --ports --status
+./scripts/cluster ps
+./scripts/cluster health lr
 ```
 
 或：
@@ -230,11 +260,13 @@ docker exec claude-lr bash -lc 'cat /home/claude/workspace/verify.txt'
 
 ## 9. 常用运维命令
 
-停止 LR：
+停止/删除 LR 容器（保留数据）：
 
 ```bash
 ./scripts/cluster stop lr
 ```
+
+注意：当前 `cluster stop` 实现为 `docker compose rm -fs`，会停止并删除 `hermes-lr` / `claude-lr` 容器，但不会删除 `data/lr-GM20230204/` bind-mounted 数据。再次 `cluster start lr` 会按当前 compose 重新创建容器。
 
 重启 LR：
 
@@ -253,7 +285,14 @@ docker exec claude-lr bash -lc 'cat /home/claude/workspace/verify.txt'
 
 ```bash
 docker pull registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:2026052201
-docker pull registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052202
+docker pull registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052204
+./scripts/cluster stop lr
+./scripts/cluster start lr
+```
+
+如果只是重启当前容器、不要求强制换镜像，可使用：
+
+```bash
 ./scripts/cluster restart lr
 ```
 
@@ -311,3 +350,7 @@ ports:
 ```
 
 4. Team Skills 远程脚本要求 `GITLAB_PRIVATE_TOKEN` 在 `.env` 中配置；镜像和 yml 文件不会保存真实 token。
+
+5. 钉钉变量当前统一使用 `DINGTALK_CLIENT_ID` / `DINGTALK_CLIENT_SECRET` / `DINGTALK_ALLOWED_USERS`。旧变量名 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` 不应再写入新的 compose/env 示例。
+
+6. 当前 Claude Code 镜像为 `registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052204`；如 `users/users.yaml` 中 tag 更新，应重新执行 `./scripts/cluster render` 并以渲染文件为准。
