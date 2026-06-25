@@ -397,7 +397,7 @@ run_remote() {
     local encoded_path
     encoded_path="scripts%2F$(printf '%s' "$script_name" | sed 's/\//%2F/g')"
     local url="${SKILLS_RAW_BASE}/${encoded_path}/raw?ref=${SKILLS_REF}"
-    local cache_dir="${TEAM_SKILLS_DIR}/.cache"
+    local cache_dir="/opt/data/.team-skills-cache"
     local cache_file="${cache_dir}/${script_name}"
 
     mkdir -p "$cache_dir"
