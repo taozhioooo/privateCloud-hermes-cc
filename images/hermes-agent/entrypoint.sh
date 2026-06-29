@@ -470,10 +470,21 @@ EOF
     chown hermes:hermes "${SOUL_PERSONAL}"
 }
 
+# 确保 /opt/data/profiles 是软链（非真目录，防止 ln -sfn 钻进目录内）
+if [[ ! -L /opt/data/profiles ]]; then
+    rm -rf /opt/data/profiles 2>/dev/null || true
+    ln -sfn /opt/data/team-skills/profiles /opt/data/profiles
+fi
+
 {
-    [[ -f "/opt/skills/L1/SOUL-company.md"              ]] && cat "/opt/skills/L1/SOUL-company.md"
-    [[ -f "/opt/skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"  ]] && cat "/opt/skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
-    [[ -f "/opt/skills/L3/${DOMAIN}/${ROLE}/SOUL-${ROLE}.md" ]] && cat "/opt/skills/L3/${DOMAIN}/${ROLE}/SOUL-${ROLE}.md"
+  # ROLE=admin 时直接用 profiles/admin/SOUL.md（路由版调度中枢）
+    if [[ "${ROLE}" == "admin" && -f /opt/data/profiles/admin/SOUL.md ]]; then
+        cat /opt/data/profiles/admin/SOUL.md
+    else
+      [[ -f "/opt/skills/L1/SOUL-company.md"              ]] && cat "/opt/skills/L1/SOUL-company.md"
+      [[ -f "/opt/skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"  ]] && cat "/opt/skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
+      [[ -f "/opt/skills/L3/${DOMAIN}/${ROLE}/SOUL-${ROLE}.md" ]] && cat "/opt/skills/L3/${DOMAIN}/${ROLE}/SOUL-${ROLE}.md"
+    fi
     cat "${SOUL_PERSONAL}"
 } > "${SOUL_OUT}" 2>/dev/null || true
 chown hermes:hermes "${SOUL_OUT}" 2>/dev/null || true
