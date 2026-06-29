@@ -62,9 +62,7 @@ services:
       - ./data/{{ user_data_dir }}/hermes:/opt/data
       - ./data/{{ user_data_dir }}/workspace:/workspace
       - ./data/{{ user_data_dir }}/ssh-pub:/home/hermes/.ssh-pub
-      - ./skills/L1:/opt/skills/L1:ro
-      - ./skills/L2:/opt/skills/L2:ro
-      - ./skills/L3:/opt/skills/L3:ro
+      - ./gmsoft-hermes-skills/profiles:/opt/data/profiles
     networks:
       - hermes-net
     deploy:

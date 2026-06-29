@@ -15,7 +15,7 @@ FROM ghcr.io/astral-sh/uv:0.11.6-python3.13-trixie AS uv_source
 FROM tianon/gosu:1.19-trixie AS gosu_source
 
 # ---------- stage: hermes-web-ui 构建 ----------
-FROM node:23.11.0-bookworm-slim AS webui_build
+FROM node:24.18.0-bookworm-slim AS webui_build
 
 # slim 镜像缺 python3 + 编译工具链,node-pty 找不到 linux-x64 prebuild 时
 # 会回退到 node-gyp rebuild,必须有 python + g++ 才能编译成功。
@@ -72,10 +72,10 @@ RUN apt-get update && \
 COPY --chmod=0755 --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 COPY --chmod=0755 --from=gosu_source /gosu /usr/local/bin/
 
-# ── Node.js 23 (hermes-web-ui 要求 >=23,ubuntu 仓库版本太旧) ────────
+# ── Node.js 24 LTS (避免 Node 23 / npm 10 组合触发 workspace 安装异常) ────────
 RUN ARCH=$(dpkg --print-architecture) \
  && case "$ARCH" in amd64) NODE_ARCH=x64 ;; arm64) NODE_ARCH=arm64 ;; *) NODE_ARCH="$ARCH" ;; esac \
- && curl -fsSL "https://nodejs.org/dist/v23.11.0/node-v23.11.0-linux-${NODE_ARCH}.tar.gz" -o /tmp/node.tgz \
+ && curl -fsSL "https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-${NODE_ARCH}.tar.gz" -o /tmp/node.tgz \
  && tar -xzf /tmp/node.tgz -C /usr/local --strip-components=1 \
  && rm -f /tmp/node.tgz \
  && node --version && npm --version

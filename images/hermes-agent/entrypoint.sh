@@ -260,9 +260,7 @@ cfg = {
     "providers": {},
     "skills": {
         "external_dirs": [
-            "/opt/skills/L1",
-            "/opt/skills/L2",
-            "/opt/skills/L3",
+            "/opt/data/skills",
         ]
     },
     "platforms": {
@@ -470,20 +468,19 @@ EOF
     chown hermes:hermes "${SOUL_PERSONAL}"
 }
 
-# 确保 /opt/data/profiles 是软链（非真目录，防止 ln -sfn 钻进目录内）
-if [[ ! -L /opt/data/profiles ]]; then
-    rm -rf /opt/data/profiles 2>/dev/null || true
-    ln -sfn /opt/data/team-skills/profiles /opt/data/profiles
+PROFILES_DIR="/opt/data/profiles"
+if [[ ! -e "${PROFILES_DIR}" ]]; then
+    ln -sfn /opt/data/team-skills/profiles "${PROFILES_DIR}"
 fi
 
 {
-  # ROLE=admin 时直接用 profiles/admin/SOUL.md（路由版调度中枢）
-    if [[ "${ROLE}" == "admin" && -f /opt/data/profiles/admin/SOUL.md ]]; then
-        cat /opt/data/profiles/admin/SOUL.md
+    # ROLE=admin 时直接用 profiles/admin/SOUL.md（路由版调度中枢）
+    if [[ "${ROLE}" == "admin" && -f "${PROFILES_DIR}/admin/SOUL.md" ]]; then
+        cat "${PROFILES_DIR}/admin/SOUL.md"
     else
-      [[ -f "/opt/skills/L1/SOUL-company.md"              ]] && cat "/opt/skills/L1/SOUL-company.md"
-      [[ -f "/opt/skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"  ]] && cat "/opt/skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
-      [[ -f "/opt/skills/L3/${DOMAIN}/${ROLE}/SOUL-${ROLE}.md" ]] && cat "/opt/skills/L3/${DOMAIN}/${ROLE}/SOUL-${ROLE}.md"
+        [[ -f "/opt/data/team-skills/L1/SOUL-company.md" ]] && cat "/opt/data/team-skills/L1/SOUL-company.md"
+        [[ -f "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md" ]] && cat "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
+        [[ -f "${PROFILES_DIR}/${ROLE}/SOUL.md" ]] && cat "${PROFILES_DIR}/${ROLE}/SOUL.md"
     fi
     cat "${SOUL_PERSONAL}"
 } > "${SOUL_OUT}" 2>/dev/null || true
@@ -525,9 +522,9 @@ cat <<BANNER
 ║  数据卷:
 ║   /opt/data       ~/.hermes profile (config.yaml / .env / skills L4 / sessions)
 ║   /workspace      工作目录 (projects / outputs / downloads)
-║   /opt/skills/L1  公司层 (只读)
-║   /opt/skills/L2  域层   (只读)
-║   /opt/skills/L3  角色层 (只读)
+║   /opt/data/team-skills/L1  公司层 (Git)
+║   /opt/data/team-skills/L2  域层   (Git)
+║   /opt/data/profiles        角色层 (挂载/软链)
 ║
 ║  常用命令:
 ║   hermes                  交互式对话
