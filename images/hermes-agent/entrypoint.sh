@@ -522,15 +522,15 @@ fi
     # L2: 领域级 — 所有角色都加载
     [[ -f "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md" ]] && cat "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
 
-    # L3: 角色级
-    # 底座：admin调度中枢 — 所有角色都加载
-    [[ -f "${PROFILES_DIR}/admin/SOUL.md" ]] && cat "${PROFILES_DIR}/admin/SOUL.md"
-    # 叠加：角色专属 SOUL（支持逗号分隔多 ROLE，admin 自身跳过避免重复）
-    IFS=',' read -ra ROLES <<< "${ROLE}"
-    for r in "${ROLES[@]}"; do
-        r=$(echo "$r" | xargs)
-        [[ "$r" != "admin" && -f "${PROFILES_DIR}/${r}/SOUL.md" ]] && cat "${PROFILES_DIR}/${r}/SOUL.md"
-    done
+    # # L3: 角色级 -> 不需要角色级，角色级SOUL.md应在profile/{role}/SOUL.md，启动profile时自行加载
+    # # 底座：admin调度中枢 — 所有角色都加载
+    # [[ -f "${PROFILES_DIR}/admin/SOUL.md" ]] && cat "${PROFILES_DIR}/admin/SOUL.md"
+    # # 叠加：角色专属 SOUL（支持逗号分隔多 ROLE，admin 自身跳过避免重复）
+    # IFS=',' read -ra ROLES <<< "${ROLE}"
+    # for r in "${ROLES[@]}"; do
+    #     r=$(echo "$r" | xargs)
+    #     [[ "$r" != "admin" && -f "${PROFILES_DIR}/${r}/SOUL.md" ]] && cat "${PROFILES_DIR}/${r}/SOUL.md"
+    # done
 
     # L4: 工作区 + 个人偏好
     cat "${HERMES_HOME}/SOUL-workspace.md"
