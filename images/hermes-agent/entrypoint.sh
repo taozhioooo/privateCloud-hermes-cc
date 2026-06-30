@@ -261,6 +261,8 @@ cfg = {
     "skills": {
         "external_dirs": [
             "/opt/data/skills",
+            "/opt/data/team-skills/L1",
+            "/opt/data/team-skills/L2",
         ]
     },
     "platforms": {
@@ -461,6 +463,12 @@ SOUL_PERSONAL="${HERMES_HOME}/SOUL-personal.md"
 
 [[ -f "${SOUL_PERSONAL}" ]] || {
     cat > "${SOUL_PERSONAL}" <<'EOF'
+## 工作区约定 (L4)
+你的工作区是 /workspace/：
+- /workspace/projects/  — 代码项目
+- /workspace/outputs/   — 生成的所有文件必须放这里
+- /workspace/downloads/ — 下载内容
+
 ## 个人偏好 (L4)
 - 使用中文回复,简洁高效
 - 代码输出使用绝对路径
