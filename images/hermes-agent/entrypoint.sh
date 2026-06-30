@@ -261,7 +261,9 @@ cfg = {
     "skills": {
         "external_dirs": [
             "/opt/data/skills",
-        ]
+            "/opt/data/team-skills/L1",
+            "/opt/data/team-skills/L2/${DOMAIN}",
+        ]  + (os.environ.get("SKILLS_EXTERNAL_DIRS", "").split(",") if os.environ.get("SKILLS_EXTERNAL_DIRS", "").strip() else []),
     },
     "platforms": {
         "api_server": {
@@ -336,6 +338,34 @@ PY
 )"
     fi
 fi
+
+# 每次启动都修正 skills.external_dirs（不受 sentinel 保护，DOMAIN 变更后生效）
+if [[ -f "${CFG_FILE}" ]]; then
+    python3 - <<PY
+import yaml
+from pathlib import Path
+cfg_file = Path("${CFG_FILE}")
+data = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+skills = data.setdefault("skills", {})
+existing = skills.get("external_dirs") or []
+# 基准路径
+base = ["/opt/data/skills", "/opt/data/team-skills/L1", "/opt/data/team-skills/L2/${DOMAIN}"]
+# 合并：保序去重（base 在前，用户自定义在后）
+seen = set()
+merged = []
+for d in base + existing:
+    d = d.strip()
+    if d and d not in seen:
+        merged.append(d)
+        seen.add(d)
+if merged != existing:
+    skills["external_dirs"] = merged
+    cfg_file.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    print(f"[entrypoint] skills.external_dirs 已更新")
+PY
+fi
+
+
 rm -f "${PROVIDER_STATE}"
 SELECTED_PROVIDER="${SELECTED_PROVIDER:-${HERMES_DEFAULT_PROVIDER:-deepseek}}"
 SELECTED_MODEL="${SELECTED_MODEL:-${HERMES_DEFAULT_MODEL:-deepseek-v4-pro}}"
@@ -459,14 +489,20 @@ fi
 SOUL_OUT="${HERMES_HOME}/SOUL.md"
 SOUL_PERSONAL="${HERMES_HOME}/SOUL-personal.md"
 
-[[ -f "${SOUL_PERSONAL}" ]] || {
-    cat > "${SOUL_PERSONAL}" <<'EOF'
+
+# 工作区约定 — 每次启动都更新（运维管控）
+cat > "${HERMES_HOME}/SOUL-workspace.md" <<'EOF'
 ## 工作区约定 (L4)
 你的工作区是 /workspace/：
 - /workspace/projects/  — 代码项目
 - /workspace/outputs/   — 生成的所有文件必须放这里
 - /workspace/downloads/ — 下载内容
+EOF
+chown hermes:hermes "${HERMES_HOME}/SOUL-workspace.md"
 
+# 个人偏好 — 仅在不存在时创建（用户自维护）
+[[ -f "${SOUL_PERSONAL}" ]] || {
+    cat > "${SOUL_PERSONAL}" <<'EOF'
 ## 个人偏好 (L4)
 - 使用中文回复,简洁高效
 - 代码输出使用绝对路径
@@ -480,14 +516,24 @@ if [[ ! -e "${PROFILES_DIR}" ]]; then
 fi
 
 {
-    # ROLE=admin 时直接用 profiles/admin/SOUL.md（路由版调度中枢）
-    if [[ "${ROLE}" == "admin" && -f "${PROFILES_DIR}/admin/SOUL.md" ]]; then
-        cat "${PROFILES_DIR}/admin/SOUL.md"
-    else
-        [[ -f "/opt/data/team-skills/L1/SOUL-company.md" ]] && cat "/opt/data/team-skills/L1/SOUL-company.md"
-        [[ -f "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md" ]] && cat "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
-        [[ -f "${PROFILES_DIR}/${ROLE}/SOUL.md" ]] && cat "${PROFILES_DIR}/${ROLE}/SOUL.md"
-    fi
+    # L1: 公司级 — 所有角色都加载
+    [[ -f "/opt/data/team-skills/L1/SOUL-company.md" ]] && cat "/opt/data/team-skills/L1/SOUL-company.md"
+
+    # L2: 领域级 — 所有角色都加载
+    [[ -f "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md" ]] && cat "/opt/data/team-skills/L2/${DOMAIN}/SOUL-${DOMAIN}.md"
+
+    # L3: 角色级
+    # 底座：admin调度中枢 — 所有角色都加载
+    [[ -f "${PROFILES_DIR}/admin/SOUL.md" ]] && cat "${PROFILES_DIR}/admin/SOUL.md"
+    # 叠加：角色专属 SOUL（支持逗号分隔多 ROLE，admin 自身跳过避免重复）
+    IFS=',' read -ra ROLES <<< "${ROLE}"
+    for r in "${ROLES[@]}"; do
+        r=$(echo "$r" | xargs)
+        [[ "$r" != "admin" && -f "${PROFILES_DIR}/${r}/SOUL.md" ]] && cat "${PROFILES_DIR}/${r}/SOUL.md"
+    done
+
+    # L4: 工作区 + 个人偏好
+    cat "${HERMES_HOME}/SOUL-workspace.md"
     cat "${SOUL_PERSONAL}"
 } > "${SOUL_OUT}" 2>/dev/null || true
 chown hermes:hermes "${SOUL_OUT}" 2>/dev/null || true

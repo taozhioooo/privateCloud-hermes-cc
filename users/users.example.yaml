@@ -59,16 +59,16 @@ users:
   - name: zhangsan
     employee_id: GM200801  # Team Skills 工号；未设置时默认等于 name
     seq: 1
-    domain: engineering
-    role: senior-engineer
+    domain: development
+    role: backend
     ssh_public_keys: []
     enabled: true
 
   # 带 SSH 公钥示例
   - name: lisi
     seq: 2
-    domain: marketing
-    role: product-manager
+    domain: development
+    role: quality
     ssh_public_keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIxxxxxxxxxxxxxxxxxxxxxxx lisi@laptop"
     enabled: true
@@ -76,8 +76,8 @@ users:
   # 资源覆盖示例 (高配)
   - name: wangwu
     seq: 3
-    domain: data
-    role: senior-engineer
+    domain: development
+    role: backend
     ssh_public_keys: []
     resources:
       hermes:
@@ -92,6 +92,6 @@ users:
   - name: zhaoliu
     seq: 4
     domain: finance
-    role: analyst
+    role: backend
     ssh_public_keys: []
     enabled: false
