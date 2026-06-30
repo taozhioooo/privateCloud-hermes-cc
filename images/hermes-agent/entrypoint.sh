@@ -261,8 +261,6 @@ cfg = {
     "skills": {
         "external_dirs": [
             "/opt/data/skills",
-            "/opt/data/team-skills/L1",
-            "/opt/data/team-skills/L2",
         ]
     },
     "platforms": {
