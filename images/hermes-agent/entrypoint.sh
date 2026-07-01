@@ -346,6 +346,8 @@ import yaml
 from pathlib import Path
 cfg_file = Path("${CFG_FILE}")
 data = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+# 启动固定工作区为 /workspace
+data["workspace"] = "/workspace"
 skills = data.setdefault("skills", {})
 existing = skills.get("external_dirs") or []
 # 基准路径
