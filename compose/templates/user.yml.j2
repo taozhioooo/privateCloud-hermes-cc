@@ -34,7 +34,7 @@ services:
       - ROLE={{ role }}
       # Team Skills 自动同步：入口只远程执行脚本；频率/仓库地址等由远程 scripts/config.env 控制
       - EMPLOYEE_ID={{ employee_id }}
-      - GITLAB_PRIVATE_TOKEN=${GITLAB_PRIVATE_TOKEN:-}
+      - GITLAB_PRIVATE_TOKEN={{ gitlab_private_token }}
       - SKILLS_RAW_BASE=${SKILLS_RAW_BASE:-}
       - SKILLS_REF=${SKILLS_REF:-master}
       - SKILLS_SYNC_INTERVAL=${SKILLS_SYNC_INTERVAL:-300}
@@ -87,6 +87,7 @@ services:
       - WEB_PORT_START={{ c_web_start }}
       - WEB_PORT_END={{ c_web_end }}
       - HERMES_HOST=hermes-{{ name }}
+      - GITLAB_PRIVATE_TOKEN={{ gitlab_private_token }}
 {%- if ssh_public_keys %}
       - SSH_PUBLIC_KEY={{ ssh_public_keys | join('\n') }}
 {%- endif %}

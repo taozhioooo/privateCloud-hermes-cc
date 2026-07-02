@@ -1,6 +1,6 @@
 version: 1
 defaults:
-  image_hermes: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:20260630-01
+  image_hermes: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/hermes-agent:20260701-01
   image_claude: registry.cn-chengdu.aliyuncs.com/gmsoft_hub/claude-code:2026052204
   resources:
     hermes:
@@ -29,4 +29,5 @@ users:
   domain: development
   role: quality,review,devops
   ssh_public_keys: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPnV6JIdb4oyOpaSzub9S/kRyNdXPZyxkYJN8GIXuEFU uph4rmt@dingtalk.com
+  gitlab_private_token: glpat-CT5bFXNpjAc6JTOJ_FhHlm86MQp1OjMH.01.0w0y9fuk7
   enabled: true

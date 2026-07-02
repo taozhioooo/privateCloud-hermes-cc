@@ -360,7 +360,7 @@ for d in base + existing:
     if d and d not in seen:
         merged.append(d)
         seen.add(d)
-if merged != existing:
+if merged != existing or data.get("workspace", '') != "/workspace" :
     skills["external_dirs"] = merged
     cfg_file.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
     print(f"[entrypoint] skills.external_dirs 已更新")
@@ -483,6 +483,20 @@ else
     if [[ -n "${EMPLOYEE_ID}" ]]; then
         log "WARN: Team Skills 缺少 GITLAB_PRIVATE_TOKEN，跳过"
     fi
+fi
+
+# ══════════════════════════════════════════════════════════════════
+# 3.5 全局 .env 同步到各 profile（非破坏性：仅补缺失/空文件）
+# ══════════════════════════════════════════════════════════════════
+if [[ -f "${HERMES_HOME}/.env" && -s "${HERMES_HOME}/.env" ]]; then
+    for pdir in /opt/data/profiles/*/; do
+        penv="${pdir}.env"
+        if [[ ! -f "${penv}" ]] || [[ ! -s "${penv}" ]]; then
+            cp "${HERMES_HOME}/.env" "${penv}"
+            chown hermes:hermes "${penv}" 2>/dev/null || true
+            log ".env synced to $(basename "$(dirname "$pdir")")"
+        fi
+    done
 fi
 
 # ══════════════════════════════════════════════════════════════════

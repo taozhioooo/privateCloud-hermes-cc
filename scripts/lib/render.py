@@ -47,6 +47,7 @@ def render_user(
         "domain": user.get("domain", "engineering"),
         "role": user.get("role", "engineer"),
         "ssh_public_keys": reg.normalize_ssh_public_keys(user.get("ssh_public_keys")),
+        "gitlab_private_token": user.get("gitlab_private_token"),
         "image_hermes": defaults["image_hermes"],
         "image_claude": defaults["image_claude"],
         "hermes_mode": defaults.get("hermes_mode", "gateway"),
